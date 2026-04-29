@@ -1,0 +1,17 @@
+@import "tailwindcss";
+
+/*
+  Brand colors — change only here to retint the app.
+  primary:     main brand (links, buttons, focus rings)
+  primary-2:   hover / active / pressed (slightly stronger)
+*/
+@theme {
+  --color-primary:rgb(45, 127, 251);
+  --color-primary-2: rgb(45, 127, 251);
+}
+
+@layer base {
+  body {
+    @apply min-h-dvh bg-zinc-50 text-zinc-900 antialiased dark:bg-zinc-950 dark:text-zinc-100;
+  }
+}
