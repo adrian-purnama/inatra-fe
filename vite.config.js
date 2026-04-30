@@ -20,6 +20,12 @@ export default defineConfig(({ mode }) => {
           changeOrigin: true,
         },
       },
+
+      preview: {
+        host: '0.0.0.0',
+        port: 4173,
+        allowedHosts: ['uat-inatra.amfphub.com'],
+      },
     },
   }
 })
