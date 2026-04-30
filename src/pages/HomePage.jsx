@@ -8,7 +8,7 @@ const homeCards = [
     description: "Manage everythinig to do with opportunity",
     to: "/opportunity",
     when: "auth",
-    requiredAny: ["post_opportunity_lineofbusiness"],
+    requiredAny: ["get_opportunity"],
     category: "normal",
   },
   {
