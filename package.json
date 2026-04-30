@@ -7,7 +7,7 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-    "start": "vite preview --host"
+    "start": "serve -s dist -l 4173"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.2.2",
@@ -15,6 +15,7 @@
     "react": "^19.2.4",
     "react-dom": "^19.2.4",
     "react-router-dom": "^7.14.0",
+    "serve": "^14.2.6",
     "tailwindcss": "^4.2.2"
   },
   "devDependencies": {
