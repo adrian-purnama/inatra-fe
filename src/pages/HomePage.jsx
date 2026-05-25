@@ -116,6 +116,15 @@ const homeCards = [
     requiredAny: ["get_location", "post_location", "post_location_sync"],
     category: "data-entry",
   },
+  {
+    id: "quotation",
+    title: "Quotation",
+    description: "Create, revise, approve, and track quotation workflow.",
+    to: "/quotation/manage",
+    when: "auth",
+    requiredAny: ["get_quotation", "post_quotation"],
+    category: "normal",
+  },
 ];
 
 export function HomePage() {

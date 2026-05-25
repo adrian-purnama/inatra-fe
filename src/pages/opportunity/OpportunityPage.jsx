@@ -1,10 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { Modal } from "../../components/Modal.jsx";
 import { SearchableDropdown } from "../../components/SearchableDropdown.jsx";
 import { useUser } from "../../context/UserContext.jsx";
 import { OpportunityWizardForm } from "../../forms/OpportunityWizardForm.jsx";
-import { apiDelete, apiGet, paths } from "../../lib/api.js";
+import { apiDelete, apiGet, apiPost, paths } from "../../lib/api.js";
 
 function hexToRgba(hex, alpha) {
   const normalized = String(hex ?? "").trim();
@@ -19,6 +19,7 @@ function hexToRgba(hex, alpha) {
 
 export function OpportunityPage() {
   const { isAuthenticated, sessionLoading, userId } = useUser();
+  const navigate = useNavigate();
   const [rows, setRows] = useState([]);
   const [statusItems, setStatusItems] = useState([]);
   const [orgOptions, setOrgOptions] = useState([]);
@@ -66,9 +67,12 @@ export function OpportunityPage() {
           return {
             ...h,
             details,
-            totalPrice: details.reduce(
-              (sum, d) => sum + Number(d.quantity ?? 0) * Number(d.price ?? 0),
-              0,
+            totalPrice: Number(
+              h.grandTotal ??
+                details.reduce(
+                  (sum, d) => sum + Number(d.quantity ?? 0) * Number(d.price ?? 0),
+                  0,
+                ),
             ),
           };
         }),
@@ -108,6 +112,19 @@ export function OpportunityPage() {
       setErr(e?.message ?? "Failed to delete opportunity");
     } finally {
       setDeletingId("");
+    }
+  }
+
+  async function handleCreateQuotationFromOpportunity(opportunityId) {
+    setErr("");
+    try {
+      const res = await apiPost(paths.quotationFromOpportunity(opportunityId), {});
+      const quotationId = String(res?.data?.item?.id ?? "");
+      if (quotationId) {
+        navigate(`/quotation/manage/${quotationId}`);
+      }
+    } catch (e) {
+      setErr(e?.message ?? "Failed to create quotation from opportunity");
     }
   }
 
@@ -312,6 +329,13 @@ export function OpportunityPage() {
                     }
                   >
                     Edit...
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => handleCreateQuotationFromOpportunity(row.id)}
+                    className="rounded-md border border-blue-300 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/30"
+                  >
+                    Create quotation
                   </button>
                   <button type="button" disabled={deletingId === row.id} onClick={() => handleDelete(row)} className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30">
                     {deletingId === row.id ? "Deleting..." : "Delete"}
