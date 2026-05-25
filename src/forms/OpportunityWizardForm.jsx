@@ -113,6 +113,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
   const [regencyId, setRegencyId] = useState("");
   const [districtId, setDistrictId] = useState("");
   const [details, setDetails] = useState([{ description: "", quantity: 1, price: 0 }]);
+  const [taxRate, setTaxRate] = useState(0);
   const [lobOptions, setLobOptions] = useState([]);
   const [segmentOptions, setSegmentOptions] = useState([]);
   const [statusOptions, setStatusOptions] = useState([]);
@@ -167,6 +168,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
           }))
         : [{ description: "", quantity: 1, price: 0 }],
     );
+    setTaxRate(Number(initial?.taxRate ?? 0));
     setAttachmentAssetIds(
       Array.isArray(initial?.attachmentAssetIds)
         ? initial.attachmentAssetIds.map((x) => String(x))
@@ -364,6 +366,13 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
     [details],
   );
 
+  const taxAmount = useMemo(
+    () => Math.max(0, (detailTotal * Number(taxRate || 0)) / 100),
+    [detailTotal, taxRate],
+  );
+
+  const grandTotal = useMemo(() => detailTotal + taxAmount, [detailTotal, taxAmount]);
+
   async function submit() {
     setFormErr("");
     if (!lineOfBusinessId || !marketSegmentId || !leadQualificationId) {
@@ -405,6 +414,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
         regencyId: optionalId(regencyId, isEdit),
         districtId: optionalId(districtId, isEdit),
         details: normalizedDetails,
+        taxRate: Number(taxRate || 0),
       };
 
       if (isEdit) {
@@ -672,11 +682,34 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
               <input type="number" min={0} placeholder="Price" value={d.price} onChange={(e) => updateDetail(idx, { price: e.target.value })} className={inputClass} />
             </div>
           ))}
+          <div className="flex flex-wrap items-end gap-3 rounded-md border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
+            <div className="min-w-[8rem]">
+              <label className="mb-1 block text-sm">Tax rate (%)</label>
+              <input
+                type="number"
+                min={0}
+                value={taxRate}
+                onChange={(e) => setTaxRate(Number(e.target.value || 0))}
+                className={inputClass}
+              />
+            </div>
+            <div className="ml-auto space-y-0.5 text-right text-sm text-zinc-700 dark:text-zinc-200">
+              <p>Subtotal: {detailTotal.toLocaleString()}</p>
+              <p>Tax: {taxAmount.toLocaleString()}</p>
+              <p className="font-semibold text-zinc-900 dark:text-zinc-100">
+                Grand total: {grandTotal.toLocaleString()}
+              </p>
+            </div>
+          </div>
+
           <div className="flex items-center justify-between">
-            <button type="button" onClick={() => setDetails((prev) => [...prev, { description: "", quantity: 1, price: 0 }])} className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm">
+            <button
+              type="button"
+              onClick={() => setDetails((prev) => [...prev, { description: "", quantity: 1, price: 0 }])}
+              className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
+            >
               Add detail row
             </button>
-            <span className="text-sm text-zinc-600">Total: {detailTotal.toLocaleString()}</span>
           </div>
 
         </div>

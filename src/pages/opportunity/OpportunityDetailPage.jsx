@@ -1,10 +1,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate, useParams } from "react-router-dom";
+import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Modal } from "../../components/Modal.jsx";
 import { PublicFileBundle } from "../../components/PublicFileBundle.jsx";
 import { useUser } from "../../context/UserContext.jsx";
 import { OpportunityWizardForm } from "../../forms/OpportunityWizardForm.jsx";
-import { apiGet, paths } from "../../lib/api.js";
+import { apiGet, apiPatch, apiPost, paths } from "../../lib/api.js";
+
+const detailInputClass =
+  "w-full min-w-0 rounded border border-zinc-300 bg-white px-2 py-1.5 text-sm text-zinc-900 focus:border-primary focus:outline-none focus:ring-1 focus:ring-primary dark:border-zinc-600 dark:bg-zinc-900 dark:text-zinc-100";
 
 function hexToRgba(hex, alpha) {
   const normalized = String(hex ?? "").trim();
@@ -56,11 +59,17 @@ function Field({ label, children }) {
 
 export function OpportunityDetailPage() {
   const { id } = useParams();
+  const navigate = useNavigate();
   const { isAuthenticated, sessionLoading, userId } = useUser();
   const [item, setItem] = useState(null);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [editOpen, setEditOpen] = useState(false);
+  const [detailRows, setDetailRows] = useState([]);
+  const [taxRateInput, setTaxRateInput] = useState(0);
+  const [detailsDirty, setDetailsDirty] = useState(false);
+  const [detailsSaving, setDetailsSaving] = useState(false);
+  const [detailsErr, setDetailsErr] = useState("");
 
   const loadDetail = useCallback(async () => {
     if (!id) return;
@@ -77,12 +86,6 @@ export function OpportunityDetailPage() {
       setItem({
         ...itemData,
         details: Array.isArray(itemData.details) ? itemData.details : [],
-        totalPrice: Array.isArray(itemData.details)
-          ? itemData.details.reduce(
-              (sum, d) => sum + Number(d.quantity ?? 0) * Number(d.price ?? 0),
-              0,
-            )
-          : Number(itemData.totalPrice ?? 0),
       });
 
     } catch (e) {
@@ -97,15 +100,93 @@ export function OpportunityDetailPage() {
     loadDetail();
   }, [loadDetail]);
 
-  const detailTotal = useMemo(() => {
-    if (!item?.details) return 0;
-    return item.details.reduce(
-      (sum, d) => sum + Number(d.quantity ?? 0) * Number(d.price ?? 0),
-      0,
+  const canEdit = item != null && String(item.ownerId) === String(userId ?? "");
+
+  useEffect(() => {
+    if (!item) {
+      setDetailRows([]);
+      setTaxRateInput(0);
+      setDetailsDirty(false);
+      return;
+    }
+    setDetailRows(
+      (item.details ?? []).map((d) => ({
+        description: String(d.description ?? ""),
+        quantity: Number(d.quantity ?? 0),
+        price: Number(d.price ?? 0),
+      })),
     );
+    setTaxRateInput(Number(item.taxRate ?? 0));
+    setDetailsDirty(false);
+    setDetailsErr("");
   }, [item]);
 
-  const total = Number(item?.totalPrice ?? detailTotal ?? 0);
+  const detailSubtotal = useMemo(
+    () =>
+      detailRows.reduce(
+        (sum, d) => sum + Number(d.quantity || 0) * Number(d.price || 0),
+        0,
+      ),
+    [detailRows],
+  );
+
+  const previewTaxAmount = useMemo(
+    () => Math.max(0, (detailSubtotal * Number(taxRateInput || 0)) / 100),
+    [detailSubtotal, taxRateInput],
+  );
+
+  const previewGrandTotal = detailSubtotal + previewTaxAmount;
+
+  const displaySubtotal = detailsDirty
+    ? detailSubtotal
+    : Number(item?.subTotal ?? detailSubtotal);
+  const displayTaxAmount = detailsDirty
+    ? previewTaxAmount
+    : Number(item?.taxAmount ?? 0);
+  const displayGrandTotal = detailsDirty
+    ? previewGrandTotal
+    : Number(item?.grandTotal ?? displaySubtotal + displayTaxAmount);
+  const displayTaxRate = detailsDirty ? taxRateInput : Number(item?.taxRate ?? 0);
+
+  async function saveInlineDetails() {
+    if (!item?.id || !canEdit) return;
+    setDetailsErr("");
+    setDetailsSaving(true);
+    try {
+      const normalizedDetails = detailRows
+        .filter((d) => String(d.description).trim().length > 0)
+        .map((d) => ({
+          description: String(d.description).trim(),
+          quantity: Number(d.quantity || 0),
+          price: Number(d.price || 0),
+        }));
+      await apiPatch(`${paths.opportunity}/${encodeURIComponent(item.id)}`, {
+        taxRate: Number(taxRateInput || 0),
+        details: normalizedDetails,
+      });
+      setDetailsDirty(false);
+      await loadDetail();
+    } catch (e) {
+      setDetailsErr(e?.message ?? "Failed to save line items");
+    } finally {
+      setDetailsSaving(false);
+    }
+  }
+
+  function updateDetailRow(idx, patch) {
+    setDetailRows((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
+    setDetailsDirty(true);
+  }
+
+  function removeDetailRow(idx) {
+    setDetailRows((prev) => prev.filter((_, i) => i !== idx));
+    setDetailsDirty(true);
+  }
+
+  function addDetailRow() {
+    setDetailRows((prev) => [...prev, { description: "", quantity: 1, price: 0 }]);
+    setDetailsDirty(true);
+  }
   const probability = Number(item?.propability ?? 0);
   const statusColor = item?.leadQualificationColor || "#6b7280";
   const statusName = item?.leadQualificationName || (item ? String(item.leadQualificationId) : "-");
@@ -122,6 +203,20 @@ export function OpportunityDetailPage() {
     return parts;
   }, [item]);
 
+  async function handleCreateQuotation() {
+    if (!item?.id) return;
+    setErr("");
+    try {
+      const res = await apiPost(paths.quotationFromOpportunity(item.id), {});
+      const quotationId = String(res?.data?.item?.id ?? "");
+      if (quotationId) {
+        navigate(`/quotation/manage/${quotationId}`);
+      }
+    } catch (e) {
+      setErr(e?.message ?? "Failed to create quotation from opportunity");
+    }
+  }
+
   if (sessionLoading)
     return <p className="text-sm text-zinc-500 dark:text-zinc-400">Loading session...</p>;
   if (!isAuthenticated) return <Navigate to="/login" replace />;
@@ -136,13 +231,22 @@ export function OpportunityDetailPage() {
           ← Back to opportunities
         </Link>
         {item && String(item.ownerId) === String(userId ?? "") ? (
-          <button
-            type="button"
-            onClick={() => setEditOpen(true)}
-            className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
-          >
-            Edit opportunity
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={handleCreateQuotation}
+              className="rounded-md border border-blue-300 px-4 py-2 text-sm font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/30"
+            >
+              Create quotation
+            </button>
+            <button
+              type="button"
+              onClick={() => setEditOpen(true)}
+              className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white transition-opacity hover:opacity-90"
+            >
+              Edit opportunity
+            </button>
+          </div>
         ) : null}
       </div>
 
@@ -213,11 +317,11 @@ export function OpportunityDetailPage() {
                   Estimated value
                 </p>
                 <p className="mt-1 text-xl font-semibold text-zinc-900 dark:text-zinc-100">
-                  {formatMoney(total)}
+                  {formatMoney(displayGrandTotal)}
                 </p>
                 <p className="mt-0.5 text-[11px] text-zinc-500 dark:text-zinc-400">
-                  {(item.details ?? []).length} line item
-                  {(item.details ?? []).length === 1 ? "" : "s"}
+                  Subtotal {formatMoney(displaySubtotal)}
+                  {displayTaxRate > 0 ? ` · Tax ${displayTaxRate}%` : ""}
                 </p>
               </div>
               <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 px-4 py-3 dark:border-zinc-700 dark:bg-zinc-800/40">
@@ -257,71 +361,214 @@ export function OpportunityDetailPage() {
           <div className="grid gap-5 lg:grid-cols-3">
             {/* Commercial breakdown */}
             <section className="rounded-2xl border border-zinc-200 bg-white p-5 shadow-sm dark:border-zinc-700 dark:bg-zinc-900 lg:col-span-2">
-              <div className="flex items-center justify-between">
+              <div className="flex flex-wrap items-center justify-between gap-2">
                 <h2 className="text-base font-semibold text-zinc-900 dark:text-zinc-100">
                   Commercial breakdown
                 </h2>
-                <p className="text-xs text-zinc-500 dark:text-zinc-400">
-                  {(item.details ?? []).length} line item
-                  {(item.details ?? []).length === 1 ? "" : "s"}
-                </p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {detailsDirty ? (
+                    <span className="text-xs font-medium text-amber-700 dark:text-amber-300">
+                      Unsaved changes
+                    </span>
+                  ) : null}
+                  {canEdit ? (
+                    <>
+                      <button
+                        type="button"
+                        onClick={addDetailRow}
+                        className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
+                      >
+                        Add row
+                      </button>
+                      <button
+                        type="button"
+                        disabled={!detailsDirty || detailsSaving}
+                        onClick={() => void saveInlineDetails()}
+                        className="rounded-md bg-primary px-3 py-1 text-xs font-medium text-white transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        {detailsSaving ? "Saving…" : "Save line items"}
+                      </button>
+                    </>
+                  ) : null}
+                </div>
               </div>
 
-              {Array.isArray(item.details) && item.details.length > 0 ? (
+              {detailsErr ? (
+                <p className="mt-2 rounded-md border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700 dark:border-red-900/70 dark:bg-red-950/30 dark:text-red-300">
+                  {detailsErr}
+                </p>
+              ) : null}
+
+              {canEdit || detailRows.length > 0 ? (
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[520px] text-left text-sm">
+                  <table className="w-full min-w-[640px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
                         <th className="px-2 py-2 font-medium">Description</th>
-                        <th className="px-2 py-2 text-right font-medium">Qty</th>
-                        <th className="px-2 py-2 text-right font-medium">Unit price</th>
-                        <th className="px-2 py-2 text-right font-medium">Subtotal</th>
+                        <th className="w-24 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-32 px-2 py-2 text-right font-medium">Unit price</th>
+                        <th className="w-32 px-2 py-2 text-right font-medium">Subtotal</th>
+                        {canEdit ? (
+                          <th className="w-20 px-2 py-2 text-right font-medium"> </th>
+                        ) : null}
                       </tr>
                     </thead>
                     <tbody>
-                      {item.details.map((d) => {
-                        const subtotal =
+                      {detailRows.map((d, idx) => {
+                        const lineSubtotal =
                           Number(d.quantity ?? 0) * Number(d.price ?? 0);
                         return (
                           <tr
-                            key={d.id}
+                            key={`detail-${idx}`}
                             className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800"
                           >
-                            <td className="px-2 py-2.5 text-zinc-800 dark:text-zinc-100">
-                              {d.description || "-"}
+                            <td className="px-2 py-2">
+                              {canEdit ? (
+                                <input
+                                  type="text"
+                                  value={d.description}
+                                  onChange={(e) =>
+                                    updateDetailRow(idx, { description: e.target.value })
+                                  }
+                                  className={detailInputClass}
+                                  placeholder="Description"
+                                />
+                              ) : (
+                                <span className="text-zinc-800 dark:text-zinc-100">
+                                  {d.description || "-"}
+                                </span>
+                              )}
                             </td>
-                            <td className="px-2 py-2.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
-                              {Number(d.quantity ?? 0)}
+                            <td className="px-2 py-2 text-right">
+                              {canEdit ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={d.quantity}
+                                  onChange={(e) =>
+                                    updateDetailRow(idx, {
+                                      quantity: Number(e.target.value || 0),
+                                    })
+                                  }
+                                  className={`${detailInputClass} text-right`}
+                                />
+                              ) : (
+                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
+                                  {Number(d.quantity ?? 0)}
+                                </span>
+                              )}
                             </td>
-                            <td className="px-2 py-2.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
-                              {formatMoney(d.price)}
+                            <td className="px-2 py-2 text-right">
+                              {canEdit ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={d.price}
+                                  onChange={(e) =>
+                                    updateDetailRow(idx, {
+                                      price: Number(e.target.value || 0),
+                                    })
+                                  }
+                                  className={`${detailInputClass} text-right`}
+                                />
+                              ) : (
+                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
+                                  {formatMoney(d.price)}
+                                </span>
+                              )}
                             </td>
                             <td className="px-2 py-2.5 text-right font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
-                              {formatMoney(subtotal)}
+                              {formatMoney(lineSubtotal)}
                             </td>
+                            {canEdit ? (
+                              <td className="px-2 py-2 text-right">
+                                <button
+                                  type="button"
+                                  onClick={() => removeDetailRow(idx)}
+                                  className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+                                >
+                                  Remove
+                                </button>
+                              </td>
+                            ) : null}
                           </tr>
                         );
                       })}
                     </tbody>
                     <tfoot>
+                      <tr className="border-t border-zinc-200 dark:border-zinc-700">
+                        <td
+                          colSpan={canEdit ? 3 : 3}
+                          className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
+                        >
+                          Subtotal
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium tabular-nums">
+                          {formatMoney(displaySubtotal)}
+                        </td>
+                        {canEdit ? <td /> : null}
+                      </tr>
+                      <tr>
+                        <td
+                          colSpan={canEdit ? 2 : 2}
+                          className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
+                        >
+                          Tax
+                        </td>
+                        <td className="px-2 py-2 text-right">
+                          {canEdit ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <input
+                                type="number"
+                                min={0}
+                                value={taxRateInput}
+                                onChange={(e) => {
+                                  setTaxRateInput(Number(e.target.value || 0));
+                                  setDetailsDirty(true);
+                                }}
+                                className={`${detailInputClass} w-20 text-right`}
+                              />
+                              <span className="text-xs text-zinc-500">%</span>
+                            </div>
+                          ) : (
+                            <span className="text-sm tabular-nums">{displayTaxRate}%</span>
+                          )}
+                        </td>
+                        <td className="px-2 py-2 text-right font-medium tabular-nums">
+                          {formatMoney(displayTaxAmount)}
+                        </td>
+                        {canEdit ? <td /> : null}
+                      </tr>
                       <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
                         <td
-                          className="px-2 py-3 text-sm font-medium text-zinc-600 dark:text-zinc-300"
-                          colSpan={3}
+                          colSpan={canEdit ? 3 : 3}
+                          className="px-2 py-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100"
                         >
-                          Total
+                          Grand total
                         </td>
                         <td className="px-2 py-3 text-right text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                          {formatMoney(total)}
+                          {formatMoney(displayGrandTotal)}
                         </td>
+                        {canEdit ? <td /> : null}
                       </tr>
                     </tfoot>
                   </table>
                 </div>
               ) : (
-                <p className="mt-3 rounded-md border border-dashed border-zinc-300 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                  No line items added yet.
-                </p>
+                <div className="mt-3 space-y-2">
+                  <p className="rounded-md border border-dashed border-zinc-300 px-3 py-6 text-center text-sm text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                    No line items added yet.
+                  </p>
+                  {canEdit ? (
+                    <button
+                      type="button"
+                      onClick={addDetailRow}
+                      className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm font-medium text-zinc-800 dark:border-zinc-600 dark:text-zinc-200"
+                    >
+                      Add first line item
+                    </button>
+                  ) : null}
+                </div>
               )}
 
               {item.notes ? (

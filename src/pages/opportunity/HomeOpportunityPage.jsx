@@ -20,6 +20,15 @@ const opportunityCards = [
     when: "auth",
     to: null,
   },
+  {
+    id: "quotation-manage",
+    title: "Quotation",
+    description: "Manage quotation drafts, approvals, and revisions.",
+    category: "normal",
+    when: "auth",
+    requiredAny: ["get_quotation", "post_quotation"],
+    to: "/quotation/manage",
+  },
 ];
 
 export function HomeOpportunityPage() {

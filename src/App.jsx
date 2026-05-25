@@ -11,7 +11,9 @@ import { HomeOpportunityPage } from "./pages/opportunity/HomeOpportunityPage.jsx
 import { ExternalOrgPage } from "./pages/ExternalOrgPage.jsx";
 import { OpportunityPage } from "./pages/opportunity/OpportunityPage.jsx";
 import { OpportunityDetailPage } from "./pages/opportunity/OpportunityDetailPage.jsx";
-import { OpportunityDataEntryPage } from "./pages/opportunity/OpportunityDataEntryPage.jsx";
+import { LineOfBusinessPage } from "./pages/LineOfBusinessPage.jsx";
+import { QuotationPage } from "./pages/quotation/QuotationPage.jsx";
+import { QuotationDetailPage } from "./pages/quotation/QuotationDetailPage.jsx";
 import { StatusManagerPage } from "./pages/StatusManagerPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
@@ -104,7 +106,9 @@ function AppShell() {
           <Route path="/opportunity" element={<HomeOpportunityPage />} />
           <Route path="/opportunity/manage" element={<OpportunityPage />} />
           <Route path="/opportunity/manage/:id" element={<OpportunityDetailPage />} />
-          <Route path="/data-entry/line-of-business" element={<OpportunityDataEntryPage />} />
+          <Route path="/quotation/manage" element={<QuotationPage />} />
+          <Route path="/quotation/manage/:id" element={<QuotationDetailPage />} />
+          <Route path="/data-entry/line-of-business" element={<LineOfBusinessPage />} />
           <Route path="/data-entry/external-org" element={<ExternalOrgPage />} />
           <Route path="/data-entry/market-segment" element={<MarketSegmentPage />} />
           <Route path="/data-entry/vendor" element={<VendorPage />} />
