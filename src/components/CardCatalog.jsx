@@ -1,4 +1,17 @@
 import { Link } from "react-router-dom";
+import {
+  Boxes,
+  BriefcaseBusiness,
+  FileText,
+  FolderTree,
+  Globe,
+  MapPin,
+  Shield,
+  SlidersHorizontal,
+  Tags,
+  Truck,
+  Users,
+} from "lucide-react";
 
 const defaultCategoryOrder = ["normal", "setting", "data-entry"];
 const defaultCategoryLabels = {
@@ -9,7 +22,7 @@ const defaultCategoryLabels = {
 
 /**
  * Shared card template:
- * { id, title, description, to, category, requiredAny, when }
+ * { id, title, description, to, category, requiredAny, when, icon }
  */
 export function CardCatalog({
   cards,
@@ -79,6 +92,7 @@ export function CardCatalog({
 }
 
 function CardItem({ card }) {
+  const Icon = iconForCard(card?.icon);
   return (
     <li>
       {card.to ? (
@@ -86,26 +100,65 @@ function CardItem({ card }) {
           to={card.to}
           className="block h-full rounded-xl border border-zinc-200 bg-white p-5 shadow-sm transition-colors hover:border-primary/40 hover:shadow-md dark:border-zinc-700 dark:bg-zinc-900"
         >
-          <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-            {card.title}
-          </h3>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {card.description}
-          </p>
+          <div className="flex items-start gap-3">
+            {Icon ? (
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                <Icon className="size-5" />
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+                {card.title}
+              </h3>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {card.description}
+              </p>
+            </div>
+          </div>
         </Link>
       ) : (
         <div className="h-full rounded-xl border border-dashed border-zinc-300 bg-zinc-50/80 p-5 dark:border-zinc-600 dark:bg-zinc-900/50">
-          <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
-            {card.title}
-          </h3>
-          <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            {card.description}
-          </p>
-          <p className="mt-3 text-xs font-medium text-primary">
-            Link this card when the page exists
-          </p>
+          <div className="flex items-start gap-3">
+            {Icon ? (
+              <span className="inline-flex size-10 shrink-0 items-center justify-center rounded-lg border border-zinc-200 bg-zinc-50 text-zinc-700 dark:border-zinc-700 dark:bg-zinc-800 dark:text-zinc-200">
+                <Icon className="size-5" />
+              </span>
+            ) : null}
+            <div className="min-w-0">
+              <h3 className="text-lg font-medium text-zinc-900 dark:text-zinc-100">
+                {card.title}
+              </h3>
+              <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
+                {card.description}
+              </p>
+              <p className="mt-3 text-xs font-medium text-primary">
+                Link this card when the page exists
+              </p>
+            </div>
+          </div>
         </div>
       )}
     </li>
   );
+}
+
+function iconForCard(icon) {
+  const key = String(icon ?? "").trim();
+  if (!key) return null;
+  const map = {
+    opportunity: BriefcaseBusiness,
+    quotation: FileText,
+    product: Boxes,
+    productFolder: FolderTree,
+    users: Users,
+    rbac: Shield,
+    appSettings: SlidersHorizontal,
+    status: Tags,
+    externalOrg: Globe,
+    lineOfBusiness: SlidersHorizontal,
+    marketSegment: Tags,
+    vendor: Truck,
+    location: MapPin,
+  };
+  return map[key] ?? null;
 }

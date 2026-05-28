@@ -22,6 +22,8 @@ export const paths = {
   authValidate: "/auth/validate",
   /** GET — public app name, logo, openRegister / openLogin */
   branding: "/branding",
+  /** GET — public company/quotation profile info */
+  appInfo: "/app/info",
   /** POST — resolve file ids to authorized signed URLs + metadata */
   publicFilesResolve: "/public-files/resolve",
   /** GET — Bearer + admin; discovered HTTP routes */
@@ -68,6 +70,38 @@ export const paths = {
   vendor: "/data-entry/vendor",
   /** POST multipart — Bearer + permission; import vendors from CSV */
   vendorImport: "/data-entry/vendor/import",
+  /** CRUD — Bearer + permission; product master data */
+  dataEntryProduct: "/data-entry/product",
+  /** CRUD — Bearer + permission; generic folder nodes */
+  folderNode: "/folder-node",
+  /** New folder API (namespace-scoped) */
+  folders: (namespace) => `/folders/${encodeURIComponent(String(namespace))}`,
+  foldersRenamePreview: (namespace, id) =>
+    `/folders/${encodeURIComponent(String(namespace))}/${encodeURIComponent(String(id))}/rename-preview`,
+  foldersRenameApply: (namespace, id) =>
+    `/folders/${encodeURIComponent(String(namespace))}/${encodeURIComponent(String(id))}/rename-apply`,
+  /** CRUD + workflow — Bearer + permission; quotation header/detail */
+  quotation: "/quotation",
+  /** GET approver candidates for quotation approval workflow */
+  quotationApprovers: "/quotation/approvers",
+  /** POST create draft quotation by opportunity id */
+  quotationFromOpportunity: (opportunityId) =>
+    `/quotation/from-opportunity/${encodeURIComponent(String(opportunityId))}`,
+  /** POST submit quotation for approval */
+  quotationSubmit: (quotationId) =>
+    `/quotation/${encodeURIComponent(String(quotationId))}/submit`,
+  /** POST approve quotation */
+  quotationApprove: (quotationId) =>
+    `/quotation/${encodeURIComponent(String(quotationId))}/approve`,
+  /** POST reject quotation */
+  quotationReject: (quotationId) =>
+    `/quotation/${encodeURIComponent(String(quotationId))}/reject`,
+  /** POST create revised quotation */
+  quotationRevise: (quotationId) =>
+    `/quotation/${encodeURIComponent(String(quotationId))}/revise`,
+  /** GET — Bearer; PDF download (open, close, loss only) */
+  quotationPdf: (quotationId) =>
+    `/quotation/${encodeURIComponent(String(quotationId))}/pdf`,
 };
 
 export function getTemplateToken() {
@@ -196,6 +230,45 @@ export async function apiPatch(path, body, config) {
 export async function apiDelete(path, config) {
   const res = await apiClient.delete(path, config);
   return handleResponse(res);
+}
+
+/**
+ * Download quotation PDF (blob). Triggers a browser file save.
+ * @param {string} quotationId
+ * @param {string} [filename] suggested download name
+ */
+export async function downloadQuotationPdf(quotationId, filename) {
+  const res = await apiClient.get(paths.quotationPdf(quotationId), {
+    responseType: "blob",
+  });
+  if (res.status < 200 || res.status >= 300) {
+    let message = res.statusText || "PDF download failed";
+    try {
+      const text = await res.data.text();
+      const parsed = JSON.parse(text);
+      if (typeof parsed?.message === "string" && parsed.message) {
+        message = parsed.message;
+      }
+    } catch {
+      /* ignore */
+    }
+    const err = new Error(message);
+    err.status = res.status;
+    throw err;
+  }
+  const blob = res.data;
+  const name =
+    filename ||
+    `Quotation_${String(quotationId).replace(/[/\\?%*:|"<>]/g, "-")}.pdf`;
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = name;
+  a.rel = "noopener";
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
 }
 
 /** Raw axios instance if you need custom verbs; prefer `apiGet` / `apiPost`. */
