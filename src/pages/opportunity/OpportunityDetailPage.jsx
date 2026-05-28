@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Modal } from "../../components/Modal.jsx";
 import { PublicFileBundle } from "../../components/PublicFileBundle.jsx";
+import { ProductSkuPicker } from "../../components/ProductSkuPicker.jsx";
 import { useUser } from "../../context/UserContext.jsx";
 import { OpportunityWizardForm } from "../../forms/OpportunityWizardForm.jsx";
 import { apiGet, apiPatch, apiPost, paths } from "../../lib/api.js";
@@ -50,7 +51,7 @@ function Field({ label, children }) {
       <p className="text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:text-zinc-400">
         {label}
       </p>
-      <div className="mt-0.5 break-words text-sm text-zinc-800 dark:text-zinc-100">
+      <div className="mt-0.5 wrap-break-word text-sm text-zinc-800 dark:text-zinc-100">
         {children}
       </div>
     </div>
@@ -111,9 +112,14 @@ export function OpportunityDetailPage() {
     }
     setDetailRows(
       (item.details ?? []).map((d) => ({
+        productId: String(d.productId ?? ""),
+        sku: String(d.sku ?? ""),
+        productName: "",
+        unit: String(d.unit ?? ""),
         description: String(d.description ?? ""),
         quantity: Number(d.quantity ?? 0),
         price: Number(d.price ?? 0),
+        discount: Number(d.discount ?? 0),
       })),
     );
     setTaxRateInput(Number(item.taxRate ?? 0));
@@ -124,7 +130,10 @@ export function OpportunityDetailPage() {
   const detailSubtotal = useMemo(
     () =>
       detailRows.reduce(
-        (sum, d) => sum + Number(d.quantity || 0) * Number(d.price || 0),
+        (sum, d) =>
+          sum +
+          Number(d.quantity || 0) * Number(d.price || 0) -
+          Number(d.discount || 0),
         0,
       ),
     [detailRows],
@@ -156,9 +165,12 @@ export function OpportunityDetailPage() {
       const normalizedDetails = detailRows
         .filter((d) => String(d.description).trim().length > 0)
         .map((d) => ({
+          productId: d.productId ? String(d.productId) : null,
           description: String(d.description).trim(),
+          unit: String(d.unit ?? "").trim(),
           quantity: Number(d.quantity || 0),
           price: Number(d.price || 0),
+          discount: Number(d.discount || 0),
         }));
       await apiPatch(`${paths.opportunity}/${encodeURIComponent(item.id)}`, {
         taxRate: Number(taxRateInput || 0),
@@ -184,7 +196,19 @@ export function OpportunityDetailPage() {
   }
 
   function addDetailRow() {
-    setDetailRows((prev) => [...prev, { description: "", quantity: 1, price: 0 }]);
+    setDetailRows((prev) => [
+      ...prev,
+      {
+        productId: "",
+        sku: "",
+        productName: "",
+        unit: "",
+        description: "",
+        quantity: 1,
+        price: 0,
+        discount: 0,
+      },
+    ]);
     setDetailsDirty(true);
   }
   const probability = Number(item?.propability ?? 0);
@@ -225,10 +249,10 @@ export function OpportunityDetailPage() {
     <div className="w-full space-y-5">
       <div className="flex items-center justify-between gap-3">
         <Link
-          to="/opportunity/manage"
+          to="/"
           className="text-sm text-primary underline-offset-2 hover:underline"
         >
-          ← Back to opportunities
+          ← Home
         </Link>
         {item && String(item.ownerId) === String(userId ?? "") ? (
           <div className="flex gap-2">
@@ -401,12 +425,15 @@ export function OpportunityDetailPage() {
 
               {canEdit || detailRows.length > 0 ? (
                 <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[640px] text-left text-sm">
+                  <table className="w-full min-w-[860px] text-left text-sm">
                     <thead>
                       <tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
+                        <th className="px-2 py-2 font-medium">Product (SKU)</th>
                         <th className="px-2 py-2 font-medium">Description</th>
-                        <th className="w-24 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-20 px-2 py-2 text-right font-medium">Qty</th>
+                        <th className="w-20 px-2 py-2 font-medium">Unit</th>
                         <th className="w-32 px-2 py-2 text-right font-medium">Unit price</th>
+                        <th className="w-28 px-2 py-2 text-right font-medium">Discount</th>
                         <th className="w-32 px-2 py-2 text-right font-medium">Subtotal</th>
                         {canEdit ? (
                           <th className="w-20 px-2 py-2 text-right font-medium"> </th>
@@ -416,12 +443,43 @@ export function OpportunityDetailPage() {
                     <tbody>
                       {detailRows.map((d, idx) => {
                         const lineSubtotal =
-                          Number(d.quantity ?? 0) * Number(d.price ?? 0);
+                          Number(d.quantity ?? 0) * Number(d.price ?? 0) -
+                          Number(d.discount ?? 0);
                         return (
                           <tr
                             key={`detail-${idx}`}
                             className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800"
                           >
+                            <td className="px-2 py-2">
+                              {canEdit ? (
+                                <ProductSkuPicker
+                                  value={d.productId}
+                                  sku={d.sku}
+                                  name={d.productName}
+                                  onChange={(sel) => {
+                                    if (!sel) {
+                                      updateDetailRow(idx, {
+                                        productId: "",
+                                        sku: "",
+                                        productName: "",
+                                        unit: "",
+                                      });
+                                      return;
+                                    }
+                                    updateDetailRow(idx, {
+                                      productId: sel.productId,
+                                      sku: sel.sku,
+                                      productName: sel.name,
+                                      unit: sel.unit ?? "",
+                                    });
+                                  }}
+                                />
+                              ) : (
+                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
+                                  {String(d.sku ?? "").trim() || "-"}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-2 py-2">
                               {canEdit ? (
                                 <input
@@ -458,6 +516,29 @@ export function OpportunityDetailPage() {
                                 </span>
                               )}
                             </td>
+                            <td className="px-2 py-2">
+                              {canEdit ? (
+                                <input
+                                  type="text"
+                                  value={d.unit}
+                                  onChange={(e) =>
+                                    updateDetailRow(idx, { unit: e.target.value })
+                                  }
+                                  className={detailInputClass}
+                                  placeholder="Unit"
+                                  disabled={Boolean(d.productId)}
+                                  title={
+                                    d.productId
+                                      ? "Unit comes from product catalog"
+                                      : "Enter unit for free-text line"
+                                  }
+                                />
+                              ) : (
+                                <span className="text-zinc-700 dark:text-zinc-200">
+                                  {d.unit || "-"}
+                                </span>
+                              )}
+                            </td>
                             <td className="px-2 py-2 text-right">
                               {canEdit ? (
                                 <input
@@ -474,6 +555,25 @@ export function OpportunityDetailPage() {
                               ) : (
                                 <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
                                   {formatMoney(d.price)}
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-2 py-2 text-right">
+                              {canEdit ? (
+                                <input
+                                  type="number"
+                                  min={0}
+                                  value={d.discount}
+                                  onChange={(e) =>
+                                    updateDetailRow(idx, {
+                                      discount: Number(e.target.value || 0),
+                                    })
+                                  }
+                                  className={`${detailInputClass} text-right`}
+                                />
+                              ) : (
+                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
+                                  {formatMoney(d.discount)}
                                 </span>
                               )}
                             </td>
@@ -498,7 +598,7 @@ export function OpportunityDetailPage() {
                     <tfoot>
                       <tr className="border-t border-zinc-200 dark:border-zinc-700">
                         <td
-                          colSpan={canEdit ? 3 : 3}
+                          colSpan={6}
                           className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
                         >
                           Subtotal
@@ -510,7 +610,7 @@ export function OpportunityDetailPage() {
                       </tr>
                       <tr>
                         <td
-                          colSpan={canEdit ? 2 : 2}
+                          colSpan={5}
                           className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
                         >
                           Tax
@@ -541,7 +641,7 @@ export function OpportunityDetailPage() {
                       </tr>
                       <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
                         <td
-                          colSpan={canEdit ? 3 : 3}
+                          colSpan={6}
                           className="px-2 py-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100"
                         >
                           Grand total
@@ -630,7 +730,9 @@ export function OpportunityDetailPage() {
                 </h2>
                 <div className="mt-3 space-y-3">
                   <Field label="Contact name">
-                    {item.contact?.contactName || "-"}
+                    {item.contact?.contactName
+                      ? `${item.contact?.contactSuffix ? `${item.contact.contactSuffix} ` : ""}${item.contact.contactName}`
+                      : "-"}
                   </Field>
                   <Field label="Channels">
                     {Array.isArray(item.contact?.contactDetails) &&

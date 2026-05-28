@@ -22,6 +22,8 @@ export const paths = {
   authValidate: "/auth/validate",
   /** GET — public app name, logo, openRegister / openLogin */
   branding: "/branding",
+  /** GET — public company/quotation profile info */
+  appInfo: "/app/info",
   /** POST — resolve file ids to authorized signed URLs + metadata */
   publicFilesResolve: "/public-files/resolve",
   /** GET — Bearer + admin; discovered HTTP routes */
@@ -68,6 +70,16 @@ export const paths = {
   vendor: "/data-entry/vendor",
   /** POST multipart — Bearer + permission; import vendors from CSV */
   vendorImport: "/data-entry/vendor/import",
+  /** CRUD — Bearer + permission; product master data */
+  dataEntryProduct: "/data-entry/product",
+  /** CRUD — Bearer + permission; generic folder nodes */
+  folderNode: "/folder-node",
+  /** New folder API (namespace-scoped) */
+  folders: (namespace) => `/folders/${encodeURIComponent(String(namespace))}`,
+  foldersRenamePreview: (namespace, id) =>
+    `/folders/${encodeURIComponent(String(namespace))}/${encodeURIComponent(String(id))}/rename-preview`,
+  foldersRenameApply: (namespace, id) =>
+    `/folders/${encodeURIComponent(String(namespace))}/${encodeURIComponent(String(id))}/rename-apply`,
   /** CRUD + workflow — Bearer + permission; quotation header/detail */
   quotation: "/quotation",
   /** GET approver candidates for quotation approval workflow */

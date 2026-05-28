@@ -62,6 +62,10 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   const [marketSegmentOptions, setMarketSegmentOptions] = useState([]);
   const [orgOptions, setOrgOptions] = useState([]);
   const [approverOptions, setApproverOptions] = useState([]);
+  const [suffixOptions, setSuffixOptions] = useState([]);
+  const [termsOfPaymentOptions, setTermsOfPaymentOptions] = useState([]);
+  const [termsOfDeliveryOptions, setTermsOfDeliveryOptions] = useState([]);
+  const [termsOfWarrantyOptions, setTermsOfWarrantyOptions] = useState([]);
   const [countryOptions, setCountryOptions] = useState([]);
   const [provinceOptions, setProvinceOptions] = useState([]);
   const [regencyOptions, setRegencyOptions] = useState([]);
@@ -75,6 +79,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   const [customerId, setCustomerId] = useState(initial?.customer?.customerId ?? "");
   const [endUserId, setEndUserId] = useState(initial?.endUser?.endUserId ?? "");
   const [contactName, setContactName] = useState(initial?.contact?.contactName ?? "");
+  const [contactSuffix, setContactSuffix] = useState(initial?.contact?.contactSuffix ?? "");
   const [contactDetailsText, setContactDetailsText] = useState(
     Array.isArray(initial?.contact?.contactDetails)
       ? initial.contact.contactDetails.join("\n")
@@ -82,6 +87,21 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   );
   const [notes, setNotes] = useState(initial?.notes ?? "");
   const [termsAndConditions, setTermsAndConditions] = useState(initial?.termsAndConditions ?? "");
+  const [termsOfPaymentSelected, setTermsOfPaymentSelected] = useState(
+    Array.isArray(initial?.quotationInformationSelected?.termsOfPaymentSelected)
+      ? initial.quotationInformationSelected.termsOfPaymentSelected.map((x) => String(x ?? ""))
+      : [],
+  );
+  const [termsOfDeliverySelected, setTermsOfDeliverySelected] = useState(
+    Array.isArray(initial?.quotationInformationSelected?.termsOfDeliverySelected)
+      ? initial.quotationInformationSelected.termsOfDeliverySelected.map((x) => String(x ?? ""))
+      : [],
+  );
+  const [termsOfWarrantySelected, setTermsOfWarrantySelected] = useState(
+    Array.isArray(initial?.quotationInformationSelected?.termsOfWarrantySelected)
+      ? initial.quotationInformationSelected.termsOfWarrantySelected.map((x) => String(x ?? ""))
+      : [],
+  );
   const [discountTotal, setDiscountTotal] = useState(initial?.discountTotal ?? 0);
   const [taxRate, setTaxRate] = useState(initial?.taxRate ?? 0);
   const [propability, setPropability] = useState(initial?.propability ?? 0);
@@ -132,6 +152,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
     setCustomerId(idOrEmpty(initial?.customer?.customerId));
     setEndUserId(idOrEmpty(initial?.endUser?.endUserId));
     setContactName(String(initial?.contact?.contactName ?? ""));
+    setContactSuffix(String(initial?.contact?.contactSuffix ?? ""));
     setContactDetailsText(
       Array.isArray(initial?.contact?.contactDetails)
         ? initial.contact.contactDetails.join("\n")
@@ -139,6 +160,21 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
     );
     setNotes(String(initial?.notes ?? ""));
     setTermsAndConditions(String(initial?.termsAndConditions ?? ""));
+    setTermsOfPaymentSelected(
+      Array.isArray(initial?.quotationInformationSelected?.termsOfPaymentSelected)
+        ? initial.quotationInformationSelected.termsOfPaymentSelected.map((x) => String(x ?? ""))
+        : [],
+    );
+    setTermsOfDeliverySelected(
+      Array.isArray(initial?.quotationInformationSelected?.termsOfDeliverySelected)
+        ? initial.quotationInformationSelected.termsOfDeliverySelected.map((x) => String(x ?? ""))
+        : [],
+    );
+    setTermsOfWarrantySelected(
+      Array.isArray(initial?.quotationInformationSelected?.termsOfWarrantySelected)
+        ? initial.quotationInformationSelected.termsOfWarrantySelected.map((x) => String(x ?? ""))
+        : [],
+    );
     setDiscountTotal(Number(initial?.discountTotal ?? 0));
     setTaxRate(Number(initial?.taxRate ?? 0));
     setPropability(Number(initial?.propability ?? 0));
@@ -200,6 +236,32 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
           (apprRes?.data?.items ?? []).map((x) => ({ value: x.id, label: x.email })),
         );
         setOrgOptions((orgRes?.data?.items ?? []).map((x) => ({ value: x.id, label: x.name })));
+        // Optional: suffix + term options from app info (do not fail the whole form)
+        try {
+          const appInfoRes = await apiGet(paths.appInfo);
+          if (cancelled) return;
+          setSuffixOptions(
+            (appInfoRes?.data?.personSuffix ?? [])
+              .map((s) => String(s ?? "").trim())
+              .filter(Boolean)
+              .map((s) => ({ value: s, label: s })),
+          );
+          const qi = appInfoRes?.data?.quotationInformation ?? {};
+          const normalizeOpt = (arr) =>
+            (Array.isArray(arr) ? arr : [])
+              .map((x) => String(x ?? "").trim())
+              .filter(Boolean);
+          setTermsOfPaymentOptions(normalizeOpt(qi.termsOfPayment));
+          setTermsOfDeliveryOptions(normalizeOpt(qi.termsOfDelivery));
+          setTermsOfWarrantyOptions(normalizeOpt(qi.termsOfWarranty));
+        } catch {
+          if (!cancelled) {
+            setSuffixOptions([]);
+            setTermsOfPaymentOptions([]);
+            setTermsOfDeliveryOptions([]);
+            setTermsOfWarrantyOptions([]);
+          }
+        }
         const countries = locRes?.data?.countries ?? [];
         const provinces = locRes?.data?.provinces ?? [];
         setCountryOptions(countries.map((x) => ({ value: x.id, label: x.name })));
@@ -211,6 +273,10 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
           setMarketSegmentOptions([]);
           setApproverOptions([]);
           setOrgOptions([]);
+          setSuffixOptions([]);
+          setTermsOfPaymentOptions([]);
+          setTermsOfDeliveryOptions([]);
+          setTermsOfWarrantyOptions([]);
         }
       }
     })();
@@ -218,6 +284,52 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
       cancelled = true;
     };
   }, []);
+
+  function toggleInList(value, setList) {
+    setList((prev) => {
+      const v = String(value ?? "").trim();
+      if (!v) return prev;
+      return prev.includes(v) ? prev.filter((x) => x !== v) : [...prev, v];
+    });
+  }
+
+  function TermsPicker({ title, options, selected, setSelected }) {
+    const rows = Array.isArray(options) ? options : [];
+    return (
+      <div className="rounded-xl border border-zinc-200 bg-zinc-50/70 p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900/60">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
+            {title}
+          </p>
+          <span className="rounded-full border border-zinc-200 bg-white px-2 py-0.5 text-xs text-zinc-700 dark:border-zinc-700 dark:bg-zinc-950 dark:text-zinc-200">
+            Selected: {Array.isArray(selected) ? selected.length : 0}
+          </span>
+        </div>
+        {rows.length === 0 ? (
+          <p className="mt-1 text-xs text-zinc-500 dark:text-zinc-400">
+            No options configured in Admin App Settings.
+          </p>
+        ) : (
+          <div className="mt-3 space-y-2">
+            {rows.map((opt) => (
+              <label
+                key={opt}
+                className="flex cursor-pointer items-start gap-2 rounded-md border border-zinc-200 bg-white px-3 py-2 text-sm hover:bg-zinc-50 dark:border-zinc-700 dark:bg-zinc-950 dark:hover:bg-zinc-900"
+              >
+                <input
+                  type="checkbox"
+                  className="mt-1 rounded border-zinc-400"
+                  checked={selected.includes(opt)}
+                  onChange={() => toggleInList(opt, setSelected)}
+                />
+                <span className="text-zinc-800 dark:text-zinc-200">{opt}</span>
+              </label>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
 
   useEffect(() => {
     let cancelled = false;
@@ -344,9 +456,13 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
         customerId: optionalId(customerId, isEdit),
         endUserId: optionalId(endUserId, isEdit),
         contactName: contactName.trim(),
+        contactSuffix: contactSuffix.trim(),
         contactDetails: splitDetailsText(contactDetailsText),
         notes: notes.trim(),
         termsAndConditions: termsAndConditions.trim(),
+        termsOfPaymentSelected,
+        termsOfDeliverySelected,
+        termsOfWarrantySelected,
         discountTotal: Number(discountTotal ?? 0),
         taxRate: Number(taxRate ?? 0),
         propability: Number(propability ?? 0),
@@ -547,6 +663,16 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
             disabled={!editable}
           />
         </div>
+        <div>
+          <p className="mb-1 text-xs text-zinc-500">Suffix</p>
+          <SearchableDropdown
+            value={contactSuffix}
+            onChange={setContactSuffix}
+            options={suffixOptions}
+            disabled={!editable}
+            placeholder="Select suffix"
+          />
+        </div>
         <div className="md:col-span-2">
           <p className="mb-1 text-xs text-zinc-500">Contact details (comma or newline)</p>
           <textarea
@@ -556,6 +682,30 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
             disabled={!editable}
           />
         </div>
+      </div>
+
+      <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">
+        Selected terms
+      </p>
+      <div className="space-y-3">
+        <TermsPicker
+          title="Terms of payment"
+          options={termsOfPaymentOptions}
+          selected={termsOfPaymentSelected}
+          setSelected={setTermsOfPaymentSelected}
+        />
+        <TermsPicker
+          title="Terms of delivery"
+          options={termsOfDeliveryOptions}
+          selected={termsOfDeliverySelected}
+          setSelected={setTermsOfDeliverySelected}
+        />
+        <TermsPicker
+          title="Warranty"
+          options={termsOfWarrantyOptions}
+          selected={termsOfWarrantySelected}
+          setSelected={setTermsOfWarrantySelected}
+        />
       </div>
 
       <p className="text-xs font-medium uppercase tracking-wide text-zinc-500">Location</p>
