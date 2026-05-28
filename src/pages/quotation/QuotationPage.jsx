@@ -21,6 +21,12 @@ const QUOTATION_STATUS_OPTIONS = [
   { value: "loss", label: "Loss" },
 ];
 
+function formatLineSku(detail) {
+  const sku = String(detail?.sku ?? "").trim();
+  if (sku) return { label: sku, isFreeText: false };
+  return { label: "freetext", isFreeText: true };
+}
+
 function locationSummary(row) {
   const parts = [];
   const n = row.locationNames;
@@ -365,10 +371,12 @@ export function QuotationPage() {
 
                 {(row.details ?? []).length > 0 ? (
                   <div className="mt-3 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                    <table className="w-full min-w-[480px] text-left text-xs">
+                    <table className="w-full min-w-[640px] text-left text-xs">
                       <thead className="bg-zinc-50 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
                         <tr>
-                          <th className="px-2 py-1.5 font-medium">Description</th>
+                          <th className="px-2 py-1.5 font-medium">SKU</th>
+                          <th className="px-2 py-1.5 font-medium">Detail</th>
+                          <th className="px-2 py-1.5 font-medium">Unit</th>
                           <th className="px-2 py-1.5 text-right font-medium">Qty</th>
                           <th className="px-2 py-1.5 text-right font-medium">Price</th>
                           <th className="px-2 py-1.5 text-right font-medium">Discount</th>
@@ -377,6 +385,7 @@ export function QuotationPage() {
                       </thead>
                       <tbody>
                         {row.details.map((d) => {
+                          const skuDisplay = formatLineSku(d);
                           const lineSubtotal =
                             Number(d.quantity ?? 0) * Number(d.price ?? 0) -
                             Number(d.discount ?? 0);
@@ -386,7 +395,21 @@ export function QuotationPage() {
                               className="border-t border-zinc-200 dark:border-zinc-700"
                             >
                               <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
-                                {d.description || "-"}
+                                {skuDisplay.isFreeText ? (
+                                  <span className="inline-flex rounded border border-dashed border-zinc-300 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
+                                    {skuDisplay.label}
+                                  </span>
+                                ) : (
+                                  <span className="font-mono text-[11px] text-zinc-800 dark:text-zinc-100">
+                                    {skuDisplay.label}
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
+                                {String(d.description ?? "").trim() || "-"}
+                              </td>
+                              <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
+                                {String(d.unit ?? "").trim() || "-"}
                               </td>
                               <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
                                 {Number(d.quantity ?? 0)}

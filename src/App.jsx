@@ -15,6 +15,9 @@ import { LineOfBusinessPage } from "./pages/LineOfBusinessPage.jsx";
 import { QuotationPage } from "./pages/quotation/QuotationPage.jsx";
 import { QuotationDetailPage } from "./pages/quotation/QuotationDetailPage.jsx";
 import { StatusManagerPage } from "./pages/StatusManagerPage.jsx";
+import { ProductPage } from "./pages/ProductPage.jsx";
+import { ProductFolderPage } from "./pages/ProductFolderPage.jsx";
+import { ProductDataEntryHubPage } from "./pages/ProductDataEntryHubPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { RegisterPage } from "./pages/RegisterPage.jsx";
@@ -113,6 +116,9 @@ function AppShell() {
           <Route path="/data-entry/market-segment" element={<MarketSegmentPage />} />
           <Route path="/data-entry/vendor" element={<VendorPage />} />
           <Route path="/data-entry/status-manager" element={<StatusManagerPage />} />
+          <Route path="/data-entry/product" element={<ProductDataEntryHubPage />} />
+          <Route path="/data-entry/product/items" element={<ProductPage />} />
+          <Route path="/data-entry/product-folder" element={<ProductFolderPage />} />
         </Routes>
       </main>
       <AdminFab />

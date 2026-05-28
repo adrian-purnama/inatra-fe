@@ -33,10 +33,9 @@ export function AdminAppPage() {
         App settings
       </h1>
       <p className="mb-6 text-sm text-zinc-600 dark:text-zinc-400">
-        App name, logo URL, and whether login / registration links are shown on
-        the site (public branding).
+        Configure branding, access rules, and company/quotation defaults.
       </p>
-      <div className="max-w-lg rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
+      <div className="max-w-4xl rounded-xl border border-zinc-200 bg-white p-6 shadow-sm dark:border-zinc-700 dark:bg-zinc-900">
         <AdminAppSettingsForm onSaved={refreshBranding} />
       </div>
     </div>

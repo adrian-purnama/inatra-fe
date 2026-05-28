@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Modal } from "../components/Modal.jsx";
+import { ProductSkuPicker } from "../components/ProductSkuPicker.jsx";
 import { SearchableDropdown } from "../components/SearchableDropdown.jsx";
 import { useUser } from "../context/UserContext.jsx";
 import { LineOfBusinessForm } from "./LineOfBusinessForm.jsx";
@@ -106,13 +107,25 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
   const [customerId, setCustomerId] = useState("");
   const [endUserId, setEndUserId] = useState("");
   const [contactName, setContactName] = useState("");
+  const [contactSuffix, setContactSuffix] = useState("");
   const [contactDetailsText, setContactDetailsText] = useState("");
   const [notes, setNotes] = useState("");
   const [countryId, setCountryId] = useState("");
   const [provinceId, setProvinceId] = useState("");
   const [regencyId, setRegencyId] = useState("");
   const [districtId, setDistrictId] = useState("");
-  const [details, setDetails] = useState([{ description: "", quantity: 1, price: 0 }]);
+  const [details, setDetails] = useState([
+    {
+      productId: "",
+      productName: "",
+      sku: "",
+      unit: "",
+      description: "",
+      quantity: 1,
+      price: 0,
+      discount: 0,
+    },
+  ]);
   const [taxRate, setTaxRate] = useState(0);
   const [lobOptions, setLobOptions] = useState([]);
   const [segmentOptions, setSegmentOptions] = useState([]);
@@ -126,6 +139,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
   const [provinceOptions, setProvinceOptions] = useState([]);
   const [regencyOptions, setRegencyOptions] = useState([]);
   const [districtOptions, setDistrictOptions] = useState([]);
+  const [suffixOptions, setSuffixOptions] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [formErr, setFormErr] = useState("");
   const [createLobOpen, setCreateLobOpen] = useState(false);
@@ -149,6 +163,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
     setCustomerId(idOrEmpty(initial?.customer?.customerId));
     setEndUserId(idOrEmpty(initial?.endUser?.endUserId));
     setContactName(String(initial?.contact?.contactName ?? ""));
+    setContactSuffix(String(initial?.contact?.contactSuffix ?? ""));
     setContactDetailsText(
       Array.isArray(initial?.contact?.contactDetails)
         ? initial.contact.contactDetails.map((x) => String(x)).join("\n")
@@ -162,11 +177,27 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
     setDetails(
       Array.isArray(initial?.details) && initial.details.length > 0
         ? initial.details.map((d) => ({
+            productId: String(d?.productId ?? ""),
+            productName: "",
+            sku: String(d?.sku ?? ""),
+            unit: String(d?.unit ?? ""),
             description: String(d?.description ?? ""),
             quantity: Number(d?.quantity ?? 0),
             price: Number(d?.price ?? 0),
+            discount: Number(d?.discount ?? 0),
           }))
-        : [{ description: "", quantity: 1, price: 0 }],
+        : [
+            {
+              productId: "",
+              productName: "",
+              sku: "",
+              unit: "",
+              description: "",
+              quantity: 1,
+              price: 0,
+              discount: 0,
+            },
+          ],
     );
     setTaxRate(Number(initial?.taxRate ?? 0));
     setAttachmentAssetIds(
@@ -202,6 +233,8 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
     let cancelled = false;
     (async () => {
       try {
+        // Load core dropdown options first. App info is optional and should not
+        // break Opportunity editing when it fails.
         const [orgRes, locRes] = await Promise.all([
           apiGet(paths.opportunityExternalOrg),
           apiGet(`${paths.location}/choices`),
@@ -215,12 +248,27 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
         const provinces = locRes?.data?.provinces ?? [];
         setProvinceRows(provinces);
         setProvinceOptions(provinces.map((x) => ({ value: x.id, label: x.name })));
+
+        // Optional: suffix list
+        try {
+          const appInfoRes = await apiGet(paths.appInfo);
+          if (cancelled) return;
+          setSuffixOptions(
+            (appInfoRes?.data?.personSuffix ?? [])
+              .map((s) => String(s ?? "").trim())
+              .filter(Boolean)
+              .map((s) => ({ value: s, label: s })),
+          );
+        } catch {
+          if (!cancelled) setSuffixOptions([]);
+        }
       } catch {
         if (!cancelled) {
           setLobOptions([]);
           setSegmentOptions([]);
           setStatusOptions([]);
           setOrgOptions([]);
+          setSuffixOptions([]);
           setCountryRows([]);
           setProvinceRows([]);
           setRegencyRows([]);
@@ -362,7 +410,14 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
   const canNext = step < STEP_TITLES.length - 1;
 
   const detailTotal = useMemo(
-    () => details.reduce((sum, d) => sum + Number(d.quantity || 0) * Number(d.price || 0), 0),
+    () =>
+      details.reduce(
+        (sum, d) =>
+          sum +
+          Number(d.quantity || 0) * Number(d.price || 0) -
+          Number(d.discount || 0),
+        0,
+      ),
     [details],
   );
 
@@ -391,9 +446,12 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
       const normalizedDetails = details
         .filter((d) => String(d.description).trim().length > 0)
         .map((d) => ({
+          productId: d.productId ? String(d.productId) : null,
           description: String(d.description).trim(),
+          unit: String(d.unit ?? "").trim(),
           quantity: Number(d.quantity || 0),
           price: Number(d.price || 0),
+          discount: Number(d.discount || 0),
         }));
 
       const body = {
@@ -408,6 +466,7 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
         customerId: optionalId(customerId, isEdit),
         endUserId: optionalId(endUserId, isEdit),
         contactName: contactName.trim(),
+        contactSuffix: contactSuffix.trim(),
         contactDetails,
         notes: notes.trim(),
         provinceId: optionalId(provinceId, isEdit),
@@ -551,6 +610,15 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
               Required
             </p>
           </div>
+          <div>
+            <label className="mb-1 block text-sm">Suffix</label>
+            <SearchableDropdown
+              value={contactSuffix}
+              onChange={setContactSuffix}
+              options={suffixOptions}
+              placeholder="Select suffix"
+            />
+          </div>
           <div className="sm:col-span-2">
             <label className="mb-1 block text-sm">Contact details (comma or newline)</label>
             <textarea value={contactDetailsText} onChange={(e) => setContactDetailsText(e.target.value)} className={`${inputClass} min-h-24`} />
@@ -676,14 +744,45 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
       {step === 3 ? (
         <div className="space-y-3">
           {details.map((d, idx) => (
-            <div key={idx} className="grid gap-2 rounded border border-zinc-200 p-3 sm:grid-cols-3">
+            <div key={idx} className="grid gap-2 rounded border border-zinc-200 p-3 sm:grid-cols-2 lg:grid-cols-6">
+              <div className="lg:col-span-2">
+                <label className="mb-1 block text-xs text-zinc-500">Product (SKU)</label>
+                <ProductSkuPicker
+                  value={d.productId}
+                  sku={d.sku}
+                  name={d.productName}
+                  onChange={(sel) => {
+                    if (!sel) {
+                      updateDetail(idx, { productId: "", sku: "", productName: "", unit: "" });
+                      return;
+                    }
+                    updateDetail(idx, {
+                      productId: sel.productId,
+                      sku: sel.sku,
+                      productName: sel.name,
+                      unit: sel.unit ?? "",
+                      ...(!d.description?.trim() ? { description: sel.name } : {}),
+                    });
+                  }}
+                />
+              </div>
               <input placeholder="Description" value={d.description} onChange={(e) => updateDetail(idx, { description: e.target.value })} className={inputClass} />
+              <input
+                type="text"
+                placeholder="Unit"
+                value={d.unit}
+                onChange={(e) => updateDetail(idx, { unit: e.target.value })}
+                className={inputClass}
+                disabled={Boolean(d.productId)}
+                title={d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"}
+              />
               <input type="number" min={0} placeholder="Qty" value={d.quantity} onChange={(e) => updateDetail(idx, { quantity: e.target.value })} className={inputClass} />
               <input type="number" min={0} placeholder="Price" value={d.price} onChange={(e) => updateDetail(idx, { price: e.target.value })} className={inputClass} />
+              <input type="number" min={0} placeholder="Discount" value={d.discount} onChange={(e) => updateDetail(idx, { discount: e.target.value })} className={inputClass} />
             </div>
           ))}
           <div className="flex flex-wrap items-end gap-3 rounded-md border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
-            <div className="min-w-[8rem]">
+            <div className="min-w-32">
               <label className="mb-1 block text-sm">Tax rate (%)</label>
               <input
                 type="number"
@@ -705,7 +804,21 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
           <div className="flex items-center justify-between">
             <button
               type="button"
-              onClick={() => setDetails((prev) => [...prev, { description: "", quantity: 1, price: 0 }])}
+              onClick={() =>
+                setDetails((prev) => [
+                  ...prev,
+                  {
+                    productId: "",
+                    productName: "",
+                    sku: "",
+                    unit: "",
+                    description: "",
+                    quantity: 1,
+                    price: 0,
+                    discount: 0,
+                  },
+                ])
+              }
               className="rounded-md border border-zinc-300 px-3 py-1.5 text-sm"
             >
               Add detail row
