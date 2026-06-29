@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Link, Navigate, useNavigate, useParams } from "react-router-dom";
 import { Modal } from "../../components/Modal.jsx";
+import { ProductSkuPicker } from "../../components/ProductSkuPicker.jsx";
 import { PublicFileBundle } from "../../components/PublicFileBundle.jsx";
 import { useUser } from "../../context/UserContext.jsx";
 import { QuotationWizardForm } from "../../forms/QuotationWizardForm.jsx";
@@ -110,14 +111,19 @@ export function QuotationDetailPage() {
       return;
     }
     setDetailRows(
-      (item.details ?? []).map((d) => ({
-        description: String(d.description ?? ""),
-        quantity: Number(d.quantity ?? 0),
-        unit: String(d.unit ?? ""),
-        sku: String(d.sku ?? ""),
-        price: Number(d.price ?? 0),
-        discount: Number(d.discount ?? 0),
-      })),
+      (item.details ?? []).map((d) => {
+        const productId = String(d.productId ?? "");
+        return {
+          productId,
+          productName: productId ? String(d.description ?? "") : "",
+          description: String(d.description ?? ""),
+          quantity: Number(d.quantity ?? 0),
+          unit: String(d.unit ?? ""),
+          sku: String(d.sku ?? ""),
+          price: Number(d.price ?? 0),
+          discount: Number(d.discount ?? 0),
+        };
+      }),
     );
     setTaxRateInput(Number(item.taxRate ?? 0));
     setDiscountTotalInput(Number(item.discountTotal ?? 0));
@@ -169,9 +175,13 @@ export function QuotationDetailPage() {
     setDetailsSaving(true);
     try {
       const normalizedDetails = detailRows
-        .filter((d) => String(d.description).trim().length > 0)
+        .filter(
+          (d) =>
+            String(d.description).trim().length > 0 || Boolean(String(d.productId ?? "").trim()),
+        )
         .map((d, idx) => ({
           sortOrder: idx,
+          productId: d.productId ? String(d.productId) : null,
           description: String(d.description).trim(),
           quantity: Number(d.quantity || 0),
           unit: String(d.unit ?? "").trim(),
@@ -206,7 +216,16 @@ export function QuotationDetailPage() {
   function addDetailRow() {
     setDetailRows((prev) => [
       ...prev,
-      { description: "", quantity: 1, unit: "", sku: "", price: 0, discount: 0 },
+      {
+        productId: "",
+        productName: "",
+        description: "",
+        quantity: 1,
+        unit: "",
+        sku: "",
+        price: 0,
+        discount: 0,
+      },
     ]);
     setDetailsDirty(true);
   }
@@ -582,7 +601,13 @@ export function QuotationDetailPage() {
                                     updateDetailRow(idx, { description: e.target.value })
                                   }
                                   className={detailInputClass}
-                                  placeholder="Description"
+                                  placeholder="Name"
+                                  disabled={Boolean(d.productId)}
+                                  title={
+                                    d.productId
+                                      ? "Name comes from product catalog"
+                                      : "Enter name for free-text line"
+                                  }
                                 />
                               ) : (
                                 <span className="text-zinc-800 dark:text-zinc-100">
@@ -615,6 +640,12 @@ export function QuotationDetailPage() {
                                   onChange={(e) => updateDetailRow(idx, { unit: e.target.value })}
                                   className={detailInputClass}
                                   placeholder="Unit"
+                                  disabled={Boolean(d.productId)}
+                                  title={
+                                    d.productId
+                                      ? "Unit comes from product catalog"
+                                      : "Enter unit for free-text line"
+                                  }
                                 />
                               ) : (
                                 <span className="text-zinc-600">{d.unit || "-"}</span>
@@ -622,12 +653,29 @@ export function QuotationDetailPage() {
                             </td>
                             <td className="px-2 py-2">
                               {canEdit ? (
-                                <input
-                                  type="text"
-                                  value={d.sku}
-                                  onChange={(e) => updateDetailRow(idx, { sku: e.target.value })}
-                                  className={`${detailInputClass} font-mono text-xs`}
-                                  placeholder="SKU"
+                                <ProductSkuPicker
+                                  value={d.productId}
+                                  sku={d.sku}
+                                  name={d.productName}
+                                  onChange={(sel) => {
+                                    if (!sel) {
+                                      updateDetailRow(idx, {
+                                        productId: "",
+                                        sku: "",
+                                        productName: "",
+                                        unit: "",
+                                        description: "",
+                                      });
+                                      return;
+                                    }
+                                    updateDetailRow(idx, {
+                                      productId: sel.productId,
+                                      sku: sel.sku,
+                                      productName: sel.name,
+                                      unit: sel.unit ?? "",
+                                      description: sel.name,
+                                    });
+                                  }}
                                 />
                               ) : (
                                 <span className="font-mono text-xs">{d.sku || "-"}</span>

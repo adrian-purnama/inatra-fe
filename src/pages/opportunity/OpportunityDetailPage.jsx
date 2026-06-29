@@ -463,6 +463,7 @@ export function OpportunityDetailPage() {
                                         sku: "",
                                         productName: "",
                                         unit: "",
+                                        description: "",
                                       });
                                       return;
                                     }
@@ -471,6 +472,7 @@ export function OpportunityDetailPage() {
                                       sku: sel.sku,
                                       productName: sel.name,
                                       unit: sel.unit ?? "",
+                                      description: sel.name,
                                     });
                                   }}
                                 />
@@ -490,6 +492,12 @@ export function OpportunityDetailPage() {
                                   }
                                   className={detailInputClass}
                                   placeholder="Description"
+                                  disabled={Boolean(d.productId)}
+                                  title={
+                                    d.productId
+                                      ? "Name comes from product catalog"
+                                      : "Enter name for free-text line"
+                                  }
                                 />
                               ) : (
                                 <span className="text-zinc-800 dark:text-zinc-100">

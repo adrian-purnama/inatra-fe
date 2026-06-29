@@ -102,6 +102,10 @@ export const paths = {
   /** GET — Bearer; PDF download (open, close, loss only) */
   quotationPdf: (quotationId) =>
     `/quotation/${encodeURIComponent(String(quotationId))}/pdf`,
+  /** GET — Bearer + permission; presales dashboard (owner-scoped) */
+  dashboardPresales: "/dashboard/presales",
+  /** GET — Bearer + get_opportunity; overall dashboard (all data) */
+  dashboardOverall: "/dashboard/overall",
 };
 
 export function getTemplateToken() {

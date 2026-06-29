@@ -23,6 +23,8 @@ import { LoginPage } from "./pages/LoginPage.jsx";
 import { RegisterPage } from "./pages/RegisterPage.jsx";
 import { MarketSegmentPage } from "./pages/MarketSegmentPage.jsx";
 import { VendorPage } from "./pages/VendorPage.jsx";
+import { PresalesDashboardPage } from "./pages/dashboard/PresalesDashboardPage.jsx";
+import { OverallDashboardPage } from "./pages/dashboard/OverallDashboardPage.jsx";
 
 const navLinkClass = ({ isActive }) =>
   `rounded-md px-2 py-1.5 text-sm transition-colors ${
@@ -111,6 +113,8 @@ function AppShell() {
           <Route path="/opportunity/manage/:id" element={<OpportunityDetailPage />} />
           <Route path="/quotation/manage" element={<QuotationPage />} />
           <Route path="/quotation/manage/:id" element={<QuotationDetailPage />} />
+          <Route path="/dashboard/presales" element={<PresalesDashboardPage />} />
+          <Route path="/dashboard/overall" element={<OverallDashboardPage />} />
           <Route path="/data-entry/line-of-business" element={<LineOfBusinessPage />} />
           <Route path="/data-entry/external-org" element={<ExternalOrgPage />} />
           <Route path="/data-entry/market-segment" element={<MarketSegmentPage />} />

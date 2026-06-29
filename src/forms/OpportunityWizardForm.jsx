@@ -753,7 +753,13 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
                   name={d.productName}
                   onChange={(sel) => {
                     if (!sel) {
-                      updateDetail(idx, { productId: "", sku: "", productName: "", unit: "" });
+                      updateDetail(idx, {
+                        productId: "",
+                        sku: "",
+                        productName: "",
+                        unit: "",
+                        description: "",
+                      });
                       return;
                     }
                     updateDetail(idx, {
@@ -761,12 +767,19 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
                       sku: sel.sku,
                       productName: sel.name,
                       unit: sel.unit ?? "",
-                      ...(!d.description?.trim() ? { description: sel.name } : {}),
+                      description: sel.name,
                     });
                   }}
                 />
               </div>
-              <input placeholder="Description" value={d.description} onChange={(e) => updateDetail(idx, { description: e.target.value })} className={inputClass} />
+              <input
+                placeholder="Description"
+                value={d.description}
+                onChange={(e) => updateDetail(idx, { description: e.target.value })}
+                className={inputClass}
+                disabled={Boolean(d.productId)}
+                title={d.productId ? "Name comes from product catalog" : "Enter name for free-text line"}
+              />
               <input
                 type="text"
                 placeholder="Unit"

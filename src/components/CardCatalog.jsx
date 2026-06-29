@@ -5,6 +5,7 @@ import {
   FileText,
   FolderTree,
   Globe,
+  LayoutDashboard,
   MapPin,
   Shield,
   SlidersHorizontal,
@@ -159,6 +160,7 @@ function iconForCard(icon) {
     marketSegment: Tags,
     vendor: Truck,
     location: MapPin,
+    dashboard: LayoutDashboard,
   };
   return map[key] ?? null;
 }

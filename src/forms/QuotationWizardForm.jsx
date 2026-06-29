@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import { ProductSkuPicker } from "../components/ProductSkuPicker.jsx";
 import { SearchableDropdown } from "../components/SearchableDropdown.jsx";
 import { apiGet, apiPatch, apiPost, paths } from "../lib/api.js";
 
@@ -30,6 +31,39 @@ function splitDetailsText(raw) {
 
 function idOrEmpty(value) {
   return typeof value === "string" ? value : "";
+}
+
+function mapQuotationDetailRow(d, i) {
+  const productId = String(d?.productId ?? "");
+  return {
+    sortOrder: Number(d?.sortOrder ?? i),
+    productId,
+    productName: productId ? String(d?.description ?? "") : "",
+    description: d?.description ?? "",
+    quantity: Number(d?.quantity ?? 0),
+    unit: d?.unit ?? "",
+    sku: d?.sku ?? "",
+    price: Number(d?.price ?? 0),
+    discount: Number(d?.discount ?? 0),
+    taxRate: Number(d?.taxRate ?? 0),
+    lineNotes: d?.lineNotes ?? "",
+  };
+}
+
+function emptyQuotationDetailRow(sortOrder = 0) {
+  return {
+    sortOrder,
+    productId: "",
+    productName: "",
+    description: "",
+    quantity: 1,
+    unit: "",
+    sku: "",
+    price: 0,
+    discount: 0,
+    taxRate: 0,
+    lineNotes: "",
+  };
 }
 
 function monthValueFromDate(value) {
@@ -118,30 +152,8 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   const [districtId, setDistrictId] = useState(initial?.location?.districtId ?? "");
   const [details, setDetails] = useState(
     Array.isArray(initial?.details) && initial.details.length > 0
-      ? initial.details.map((d, i) => ({
-          sortOrder: Number(d.sortOrder ?? i),
-          description: d.description ?? "",
-          quantity: Number(d.quantity ?? 0),
-          unit: d.unit ?? "",
-          sku: d.sku ?? "",
-          price: Number(d.price ?? 0),
-          discount: Number(d.discount ?? 0),
-          taxRate: Number(d.taxRate ?? 0),
-          lineNotes: d.lineNotes ?? "",
-        }))
-      : [
-          {
-            sortOrder: 0,
-            description: "",
-            quantity: 1,
-            unit: "",
-            sku: "",
-            price: 0,
-            discount: 0,
-            taxRate: 0,
-            lineNotes: "",
-          },
-        ],
+      ? initial.details.map(mapQuotationDetailRow)
+      : [emptyQuotationDetailRow(0)],
   );
 
   useEffect(() => {
@@ -186,30 +198,8 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
     setDistrictId(idOrEmpty(initial?.location?.districtId));
     setDetails(
       Array.isArray(initial?.details) && initial.details.length > 0
-        ? initial.details.map((d, i) => ({
-            sortOrder: Number(d.sortOrder ?? i),
-            description: d.description ?? "",
-            quantity: Number(d.quantity ?? 0),
-            unit: d.unit ?? "",
-            sku: d.sku ?? "",
-            price: Number(d.price ?? 0),
-            discount: Number(d.discount ?? 0),
-            taxRate: Number(d.taxRate ?? 0),
-            lineNotes: d.lineNotes ?? "",
-          }))
-        : [
-            {
-              sortOrder: 0,
-              description: "",
-              quantity: 1,
-              unit: "",
-              sku: "",
-              price: 0,
-              discount: 0,
-              taxRate: 0,
-              lineNotes: "",
-            },
-          ],
+        ? initial.details.map(mapQuotationDetailRow)
+        : [emptyQuotationDetailRow(0)],
     );
     setFormErr("");
   }, [initial]);
@@ -422,20 +412,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   }
 
   function addDetail() {
-    setDetails((prev) => [
-      ...prev,
-      {
-        sortOrder: prev.length,
-        description: "",
-        quantity: 1,
-        unit: "",
-        sku: "",
-        price: 0,
-        discount: 0,
-        taxRate: 0,
-        lineNotes: "",
-      },
-    ]);
+    setDetails((prev) => [...prev, emptyQuotationDetailRow(prev.length)]);
   }
 
   async function onSubmit(e) {
@@ -474,7 +451,14 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
         districtId: optionalId(districtId, isEdit),
         details: details
           .map((d, i) => ({ ...d, sortOrder: i }))
-          .filter((d) => String(d.description ?? "").trim().length > 0),
+          .filter(
+            (d) =>
+              String(d.description ?? "").trim().length > 0 || Boolean(String(d.productId ?? "").trim()),
+          )
+          .map(({ productId, productName: _pn, ...d }) => ({
+            ...d,
+            productId: productId ? String(productId) : null,
+          })),
       };
       if (isEdit) {
         await apiPatch(`${paths.quotation}/${encodeURIComponent(initial.id)}`, payload);
@@ -783,12 +767,43 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
         <div className="space-y-2">
           {details.map((d, idx) => (
             <div key={idx} className="grid gap-2 md:grid-cols-6">
+              <div className="md:col-span-2">
+                <label className="mb-1 block text-xs text-zinc-500">Product (SKU)</label>
+                <ProductSkuPicker
+                  value={d.productId}
+                  sku={d.sku}
+                  name={d.productName}
+                  disabled={!editable}
+                  onChange={(sel) => {
+                    if (!sel) {
+                      updateDetail(idx, {
+                        productId: "",
+                        sku: "",
+                        productName: "",
+                        unit: "",
+                        description: "",
+                      });
+                      return;
+                    }
+                    updateDetail(idx, {
+                      productId: sel.productId,
+                      sku: sel.sku,
+                      productName: sel.name,
+                      unit: sel.unit ?? "",
+                      description: sel.name,
+                    });
+                  }}
+                />
+              </div>
               <input
                 className={inputClass}
                 value={d.description}
                 onChange={(e) => updateDetail(idx, { description: e.target.value })}
-                placeholder="Description"
-                disabled={!editable}
+                placeholder="Name"
+                disabled={!editable || Boolean(d.productId)}
+                title={
+                  d.productId ? "Name comes from product catalog" : "Enter name for free-text line"
+                }
               />
               <input
                 className={inputClass}
@@ -822,14 +837,10 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
                 value={d.unit}
                 onChange={(e) => updateDetail(idx, { unit: e.target.value })}
                 placeholder="Unit"
-                disabled={!editable}
-              />
-              <input
-                className={inputClass}
-                value={d.sku}
-                onChange={(e) => updateDetail(idx, { sku: e.target.value })}
-                placeholder="SKU"
-                disabled={!editable}
+                disabled={!editable || Boolean(d.productId)}
+                title={
+                  d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"
+                }
               />
             </div>
           ))}
