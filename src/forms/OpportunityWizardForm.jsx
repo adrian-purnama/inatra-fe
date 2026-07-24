@@ -501,6 +501,26 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
     setDetails((prev) => prev.map((row, i) => (i === idx ? { ...row, ...patch } : row)));
   }
 
+  function removeDetail(idx) {
+    setDetails((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length > 0
+        ? next
+        : [
+            {
+              productId: "",
+              productName: "",
+              sku: "",
+              unit: "",
+              description: "",
+              quantity: 1,
+              price: 0,
+              discount: 0,
+            },
+          ];
+    });
+  }
+
   async function onUploadAttachment(file) {
     if (!isEdit || !initial?.id || !file) return;
     setUploadAttachmentErr("");
@@ -744,8 +764,11 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
       {step === 3 ? (
         <div className="space-y-3">
           {details.map((d, idx) => (
-            <div key={idx} className="grid gap-2 rounded border border-zinc-200 p-3 sm:grid-cols-2 lg:grid-cols-6">
-              <div className="lg:col-span-2">
+            <div
+              key={idx}
+              className="grid gap-2 rounded border border-zinc-200 p-3 sm:grid-cols-2 lg:grid-cols-6 dark:border-zinc-700"
+            >
+              <div className="sm:col-span-2 lg:col-span-2">
                 <label className="mb-1 block text-xs text-zinc-500">Product (SKU)</label>
                 <ProductSkuPicker
                   value={d.productId}
@@ -753,7 +776,13 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
                   name={d.productName}
                   onChange={(sel) => {
                     if (!sel) {
-                      updateDetail(idx, { productId: "", sku: "", productName: "", unit: "" });
+                      updateDetail(idx, {
+                        productId: "",
+                        sku: "",
+                        productName: "",
+                        unit: "",
+                        description: "",
+                      });
                       return;
                     }
                     updateDetail(idx, {
@@ -761,24 +790,76 @@ export function OpportunityWizardForm({ initial = null, currentUserId, onSuccess
                       sku: sel.sku,
                       productName: sel.name,
                       unit: sel.unit ?? "",
-                      ...(!d.description?.trim() ? { description: sel.name } : {}),
+                      description: sel.name,
                     });
                   }}
                 />
               </div>
-              <input placeholder="Description" value={d.description} onChange={(e) => updateDetail(idx, { description: e.target.value })} className={inputClass} />
-              <input
-                type="text"
-                placeholder="Unit"
-                value={d.unit}
-                onChange={(e) => updateDetail(idx, { unit: e.target.value })}
-                className={inputClass}
-                disabled={Boolean(d.productId)}
-                title={d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"}
-              />
-              <input type="number" min={0} placeholder="Qty" value={d.quantity} onChange={(e) => updateDetail(idx, { quantity: e.target.value })} className={inputClass} />
-              <input type="number" min={0} placeholder="Price" value={d.price} onChange={(e) => updateDetail(idx, { price: e.target.value })} className={inputClass} />
-              <input type="number" min={0} placeholder="Discount" value={d.discount} onChange={(e) => updateDetail(idx, { discount: e.target.value })} className={inputClass} />
+              <div className="sm:col-span-2 lg:col-span-2">
+                <label className="mb-1 block text-xs text-zinc-500">Description</label>
+                <input
+                  placeholder="Description"
+                  value={d.description}
+                  onChange={(e) => updateDetail(idx, { description: e.target.value })}
+                  className={inputClass}
+                  disabled={Boolean(d.productId)}
+                  title={d.productId ? "Name comes from product catalog" : "Enter name for free-text line"}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Unit</label>
+                <input
+                  type="text"
+                  placeholder="Unit"
+                  value={d.unit}
+                  onChange={(e) => updateDetail(idx, { unit: e.target.value })}
+                  className={inputClass}
+                  disabled={Boolean(d.productId)}
+                  title={d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Qty</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Qty"
+                  value={d.quantity}
+                  onChange={(e) => updateDetail(idx, { quantity: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Price</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Price"
+                  value={d.price}
+                  onChange={(e) => updateDetail(idx, { price: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Discount</label>
+                <input
+                  type="number"
+                  min={0}
+                  placeholder="Discount"
+                  value={d.discount}
+                  onChange={(e) => updateDetail(idx, { discount: e.target.value })}
+                  className={inputClass}
+                />
+              </div>
+              <div className="flex items-end sm:col-span-2 lg:col-span-6">
+                <button
+                  type="button"
+                  onClick={() => removeDetail(idx)}
+                  className="rounded border border-red-300 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
+                >
+                  Remove
+                </button>
+              </div>
             </div>
           ))}
           <div className="flex flex-wrap items-end gap-3 rounded-md border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">

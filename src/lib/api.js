@@ -20,6 +20,8 @@ export const paths = {
   authMe: "/auth/me",
   /** GET — same payload as `authMe` (alias for session checks) */
   authValidate: "/auth/validate",
+  /** POST multipart `file` — private e-sign image (owner ACL only) */
+  authMeEsign: "/auth/me/esign",
   /** GET — public app name, logo, openRegister / openLogin */
   branding: "/branding",
   /** GET — public company/quotation profile info */
@@ -102,6 +104,10 @@ export const paths = {
   /** GET — Bearer; PDF download (open, close, loss only) */
   quotationPdf: (quotationId) =>
     `/quotation/${encodeURIComponent(String(quotationId))}/pdf`,
+  /** GET — Bearer + permission; presales dashboard (owner-scoped) */
+  dashboardPresales: "/dashboard/presales",
+  /** GET — Bearer + get_opportunity; overall dashboard (all data) */
+  dashboardOverall: "/dashboard/overall",
 };
 
 export function getTemplateToken() {

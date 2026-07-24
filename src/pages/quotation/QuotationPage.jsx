@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Link, Navigate } from "react-router-dom";
+import { Link, Navigate, useNavigate } from "react-router-dom";
 import { SearchableDropdown } from "../../components/SearchableDropdown.jsx";
 import { useUser } from "../../context/UserContext.jsx";
 import {
@@ -9,7 +9,7 @@ import {
   quotationStatusColor,
   quotationStatusLabel,
 } from "../../lib/formatters.js";
-import { apiDelete, apiGet, paths } from "../../lib/api.js";
+import { apiDelete, apiGet, apiPost, paths } from "../../lib/api.js";
 
 const QUOTATION_STATUS_OPTIONS = [
   { value: "", label: "All statuses" },
@@ -21,12 +21,6 @@ const QUOTATION_STATUS_OPTIONS = [
   { value: "loss", label: "Loss" },
 ];
 
-function formatLineSku(detail) {
-  const sku = String(detail?.sku ?? "").trim();
-  if (sku) return { label: sku, isFreeText: false };
-  return { label: "freetext", isFreeText: true };
-}
-
 function locationSummary(row) {
   const parts = [];
   const n = row.locationNames;
@@ -37,12 +31,14 @@ function locationSummary(row) {
 }
 
 export function QuotationPage() {
+  const navigate = useNavigate();
   const { isAuthenticated, sessionLoading, userId } = useUser();
   const [rows, setRows] = useState([]);
   const [orgOptions, setOrgOptions] = useState([]);
   const [loading, setLoading] = useState(false);
   const [err, setErr] = useState("");
   const [deletingId, setDeletingId] = useState("");
+  const [revisingNo, setRevisingNo] = useState("");
   const [filters, setFilters] = useState({
     onlyMine: false,
     customerId: "",
@@ -101,6 +97,30 @@ export function QuotationPage() {
     loadItems();
   }, [loadItems]);
 
+  const groups = useMemo(() => {
+    const map = new Map();
+    for (const row of rows) {
+      const key = String(row.quotationNo ?? "").trim() || String(row.id);
+      const list = map.get(key) ?? [];
+      list.push(row);
+      map.set(key, list);
+    }
+    const out = [];
+    for (const [quotationNo, revs] of map) {
+      const sorted = [...revs].sort(
+        (a, b) => Number(b.revisionNo ?? 0) - Number(a.revisionNo ?? 0),
+      );
+      out.push({
+        quotationNo,
+        revs: sorted,
+        latest: sorted[0],
+        openRev: sorted.find((r) => String(r.quotationStatus) === "open") ?? null,
+      });
+    }
+    // ponytail: page order = first-seen latest; no cross-page group sort
+    return out;
+  }, [rows]);
+
   async function handleDelete(item) {
     setErr("");
     setDeletingId(item.id);
@@ -111,6 +131,23 @@ export function QuotationPage() {
       setErr(e?.message ?? "Failed to delete quotation");
     } finally {
       setDeletingId("");
+    }
+  }
+
+  async function handleCreateRevision(group) {
+    const openId = group.openRev?.id;
+    if (!openId) return;
+    setErr("");
+    setRevisingNo(group.quotationNo);
+    try {
+      const res = await apiPost(paths.quotationRevise(openId), {});
+      const nextId = String(res?.data?.item?.id ?? "");
+      if (nextId) navigate(`/quotation/manage/${nextId}`);
+      else await loadItems();
+    } catch (e) {
+      setErr(e?.message ?? "Failed to create revision");
+    } finally {
+      setRevisingNo("");
     }
   }
 
@@ -142,7 +179,7 @@ export function QuotationPage() {
             Quotations
           </h1>
           <p className="mt-1 text-sm text-zinc-600 dark:text-zinc-400">
-            Browse and filter quotations. Create new quotes from an opportunity detail page.
+            Grouped by quotation number. Create new quotes from an opportunity detail page.
           </p>
         </div>
         <Link
@@ -253,29 +290,32 @@ export function QuotationPage() {
         <p className="rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
           Loading quotations...
         </p>
-      ) : rows.length === 0 ? (
+      ) : groups.length === 0 ? (
         <p className="rounded-md border border-zinc-200 bg-white px-4 py-3 text-sm text-zinc-600 dark:border-zinc-700 dark:bg-zinc-900 dark:text-zinc-300">
           No quotations match your filters.
         </p>
       ) : (
         <div className="space-y-3">
-          {rows.map((row) => {
+          {groups.map((group) => {
+            const row = group.latest;
             const status = String(row.quotationStatus ?? "");
             const statusColor = quotationStatusColor(status);
-            const canDelete = ["draft", "rejected"].includes(status);
             const isOwner = String(row.ownerId) === String(userId ?? "");
+            const canCreateRevision = isOwner && Boolean(group.openRev);
 
             return (
               <article
-                key={row.id}
+                key={group.quotationNo}
                 className="rounded-xl border border-zinc-200 bg-white p-4 shadow-sm dark:border-zinc-700 dark:bg-zinc-900"
                 style={{ borderTop: `3px solid ${statusColor}` }}
               >
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-sm font-semibold text-zinc-900 dark:text-zinc-100">
-                      {row.quotationNo}{" "}
-                      <span className="font-normal text-zinc-500">Rev {row.revisionNo}</span>
+                      {group.quotationNo}
+                      <span className="ml-2 font-normal text-zinc-500">
+                        {group.revs.length} rev{group.revs.length === 1 ? "" : "s"}
+                      </span>
                     </p>
                     <p className="mt-0.5 text-xs text-zinc-500 dark:text-zinc-400">
                       {row.customer?.customerName || "Unknown customer"}
@@ -290,25 +330,69 @@ export function QuotationPage() {
                       to={`/quotation/manage/${row.id}`}
                       className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-50 dark:border-zinc-600 dark:text-zinc-200 dark:hover:bg-zinc-800"
                     >
-                      View
+                      View latest
                     </Link>
-                    {canDelete ? (
+                    {canCreateRevision ? (
                       <button
                         type="button"
-                        disabled={deletingId === row.id || !isOwner}
-                        onClick={() => handleDelete(row)}
-                        className="rounded-md border border-red-300 px-2.5 py-1 text-xs font-medium text-red-700 transition-colors hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
-                        title={!isOwner ? "Only owner can delete" : undefined}
+                        disabled={revisingNo === group.quotationNo}
+                        onClick={() => handleCreateRevision(group)}
+                        className="rounded-md border border-zinc-300 px-2.5 py-1 text-xs font-medium text-zinc-800 transition-colors hover:bg-zinc-50 disabled:opacity-50 dark:border-zinc-600 dark:text-zinc-200"
                       >
-                        {deletingId === row.id ? "Deleting..." : "Delete"}
+                        {revisingNo === group.quotationNo
+                          ? "Creating..."
+                          : "Create revision"}
                       </button>
                     ) : null}
                   </div>
                 </div>
 
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {group.revs.map((rev) => {
+                    const revStatus = String(rev.quotationStatus ?? "");
+                    const revColor = quotationStatusColor(revStatus);
+                    const canDelete = ["draft", "rejected"].includes(revStatus);
+                    const revOwner = String(rev.ownerId) === String(userId ?? "");
+                    return (
+                      <div
+                        key={rev.id}
+                        className="flex flex-wrap items-center gap-1.5 rounded-md border border-zinc-200 px-2 py-1 dark:border-zinc-700"
+                      >
+                        <Link
+                          to={`/quotation/manage/${rev.id}`}
+                          className="text-xs font-medium text-zinc-800 underline-offset-2 hover:underline dark:text-zinc-200"
+                        >
+                          Rev {rev.revisionNo}
+                        </Link>
+                        <span
+                          className="inline-flex items-center rounded border px-1.5 py-0.5 text-[10px] font-medium capitalize"
+                          style={{
+                            color: revColor,
+                            backgroundColor: hexToRgba(revColor, 0.14),
+                            borderColor: hexToRgba(revColor, 0.42),
+                          }}
+                        >
+                          {quotationStatusLabel(revStatus)}
+                        </span>
+                        {canDelete ? (
+                          <button
+                            type="button"
+                            disabled={deletingId === rev.id || !revOwner}
+                            onClick={() => handleDelete(rev)}
+                            className="rounded border border-red-300 px-1.5 py-0.5 text-[10px] font-medium text-red-700 hover:bg-red-50 disabled:cursor-not-allowed disabled:opacity-50 dark:border-red-700 dark:text-red-300"
+                            title={!revOwner ? "Only owner can delete" : undefined}
+                          >
+                            {deletingId === rev.id ? "…" : "Delete"}
+                          </button>
+                        ) : null}
+                      </div>
+                    );
+                  })}
+                </div>
+
                 <div className="mt-3 grid gap-2 text-sm text-zinc-700 dark:text-zinc-300 sm:grid-cols-2 lg:grid-cols-3">
                   <p>
-                    <span className="text-zinc-500 dark:text-zinc-400">Status:</span>{" "}
+                    <span className="text-zinc-500 dark:text-zinc-400">Latest status:</span>{" "}
                     <span
                       className="inline-flex items-center rounded-md border px-1.5 py-0.5 text-xs font-medium capitalize"
                       style={{
@@ -349,10 +433,6 @@ export function QuotationPage() {
                     {prettyDate(row.validUntil)}
                   </p>
                   <p>
-                    <span className="text-zinc-500 dark:text-zinc-400">Detail rows:</span>{" "}
-                    {(row.details ?? []).length}
-                  </p>
-                  <p>
                     <span className="text-zinc-500 dark:text-zinc-400">Location:</span>{" "}
                     {locationSummary(row)}
                   </p>
@@ -368,68 +448,6 @@ export function QuotationPage() {
                     </p>
                   ) : null}
                 </div>
-
-                {(row.details ?? []).length > 0 ? (
-                  <div className="mt-3 overflow-x-auto rounded-lg border border-zinc-200 dark:border-zinc-700">
-                    <table className="w-full min-w-[640px] text-left text-xs">
-                      <thead className="bg-zinc-50 text-zinc-600 dark:bg-zinc-800/60 dark:text-zinc-300">
-                        <tr>
-                          <th className="px-2 py-1.5 font-medium">SKU</th>
-                          <th className="px-2 py-1.5 font-medium">Detail</th>
-                          <th className="px-2 py-1.5 font-medium">Unit</th>
-                          <th className="px-2 py-1.5 text-right font-medium">Qty</th>
-                          <th className="px-2 py-1.5 text-right font-medium">Price</th>
-                          <th className="px-2 py-1.5 text-right font-medium">Discount</th>
-                          <th className="px-2 py-1.5 text-right font-medium">Subtotal</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {row.details.map((d) => {
-                          const skuDisplay = formatLineSku(d);
-                          const lineSubtotal =
-                            Number(d.quantity ?? 0) * Number(d.price ?? 0) -
-                            Number(d.discount ?? 0);
-                          return (
-                            <tr
-                              key={d.id}
-                              className="border-t border-zinc-200 dark:border-zinc-700"
-                            >
-                              <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
-                                {skuDisplay.isFreeText ? (
-                                  <span className="inline-flex rounded border border-dashed border-zinc-300 px-1.5 py-0.5 text-[11px] font-medium uppercase tracking-wide text-zinc-500 dark:border-zinc-600 dark:text-zinc-400">
-                                    {skuDisplay.label}
-                                  </span>
-                                ) : (
-                                  <span className="font-mono text-[11px] text-zinc-800 dark:text-zinc-100">
-                                    {skuDisplay.label}
-                                  </span>
-                                )}
-                              </td>
-                              <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
-                                {String(d.description ?? "").trim() || "-"}
-                              </td>
-                              <td className="px-2 py-1.5 text-zinc-700 dark:text-zinc-200">
-                                {String(d.unit ?? "").trim() || "-"}
-                              </td>
-                              <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
-                                {Number(d.quantity ?? 0)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
-                                {formatMoney(d.price)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right tabular-nums text-zinc-700 dark:text-zinc-200">
-                                {formatMoney(d.discount)}
-                              </td>
-                              <td className="px-2 py-1.5 text-right font-medium tabular-nums text-zinc-800 dark:text-zinc-100">
-                                {formatMoney(lineSubtotal)}
-                              </td>
-                            </tr>
-                          );
-                        })}
-                      </tbody>
-                    </table>
-                  </div>
-                ) : null}
               </article>
             );
           })}

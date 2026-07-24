@@ -21,8 +21,11 @@ import { ProductDataEntryHubPage } from "./pages/ProductDataEntryHubPage.jsx";
 import { HomePage } from "./pages/HomePage.jsx";
 import { LoginPage } from "./pages/LoginPage.jsx";
 import { RegisterPage } from "./pages/RegisterPage.jsx";
+import { ProfilePage } from "./pages/ProfilePage.jsx";
 import { MarketSegmentPage } from "./pages/MarketSegmentPage.jsx";
 import { VendorPage } from "./pages/VendorPage.jsx";
+import { PresalesDashboardPage } from "./pages/dashboard/PresalesDashboardPage.jsx";
+import { OverallDashboardPage } from "./pages/dashboard/OverallDashboardPage.jsx";
 
 const navLinkClass = ({ isActive }) =>
   `rounded-md px-2 py-1.5 text-sm transition-colors ${
@@ -78,6 +81,9 @@ function AppShell() {
             </>
           ) : (
             <>
+              <NavLink to="/profile" className={navLinkClass}>
+                Profile
+              </NavLink>
               {email ? (
                 <span
                   className="max-w-[12rem] truncate text-sm text-zinc-600 dark:text-zinc-400"
@@ -102,6 +108,7 @@ function AppShell() {
           <Route path="/" element={<HomePage />} />
           <Route path="/login" element={<LoginPage />} />
           <Route path="/register" element={<RegisterPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
           <Route path="/admin/rbac" element={<AdminRbacPage />} />
           <Route path="/admin/users" element={<AdminUsersPage />} />
           <Route path="/admin/app" element={<AdminAppPage />} />
@@ -111,6 +118,8 @@ function AppShell() {
           <Route path="/opportunity/manage/:id" element={<OpportunityDetailPage />} />
           <Route path="/quotation/manage" element={<QuotationPage />} />
           <Route path="/quotation/manage/:id" element={<QuotationDetailPage />} />
+          <Route path="/dashboard/presales" element={<PresalesDashboardPage />} />
+          <Route path="/dashboard/overall" element={<OverallDashboardPage />} />
           <Route path="/data-entry/line-of-business" element={<LineOfBusinessPage />} />
           <Route path="/data-entry/external-org" element={<ExternalOrgPage />} />
           <Route path="/data-entry/market-segment" element={<MarketSegmentPage />} />

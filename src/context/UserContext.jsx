@@ -17,6 +17,24 @@ import {
 
 const UserContext = createContext(null);
 
+function mapMeUser(d) {
+  if (!d || typeof d.id !== "string" || typeof d.email !== "string") {
+    return null;
+  }
+  return {
+    id: d.id,
+    email: d.email,
+    fullName: typeof d.fullName === "string" ? d.fullName : "",
+    suffix: typeof d.suffix === "string" ? d.suffix : "",
+    eSignFileId: typeof d.eSignFileId === "string" ? d.eSignFileId : null,
+    isSuperAdmin: Boolean(d.isSuperAdmin),
+    isAdmin: Boolean(d.isAdmin),
+    permissionKeys: Array.isArray(d.permissionKeys)
+      ? d.permissionKeys.filter((p) => typeof p === "string")
+      : [],
+  };
+}
+
 export function UserProvider({ children }) {
   const [token, setTokenState] = useState(() => getTemplateToken());
   /** From `GET /auth/validate` (same as `/auth/me` on the server) */
@@ -39,22 +57,9 @@ export function UserProvider({ children }) {
       setSessionLoading(true);
       try {
         const res = await apiGet(paths.authValidate);
-        const d = res?.data;
-        if (
-          !cancelled &&
-          d &&
-          typeof d.id === "string" &&
-          typeof d.email === "string"
-        ) {
-          setUser({
-            id: d.id,
-            email: d.email,
-            isSuperAdmin: Boolean(d.isSuperAdmin),
-            isAdmin: Boolean(d.isAdmin),
-            permissionKeys: Array.isArray(d.permissionKeys)
-              ? d.permissionKeys.filter((p) => typeof p === "string")
-              : [],
-          });
+        const next = mapMeUser(res?.data);
+        if (!cancelled && next) {
+          setUser(next);
           return;
         }
         if (!cancelled && getTemplateToken()) {
@@ -91,6 +96,11 @@ export function UserProvider({ children }) {
     setSessionLoading(false);
   }, []);
 
+  const applyMeUser = useCallback((data) => {
+    const next = mapMeUser(data);
+    if (next) setUser(next);
+  }, []);
+
   const value = useMemo(
     () => ({
       token,
@@ -99,6 +109,9 @@ export function UserProvider({ children }) {
       isAuthenticated: Boolean(user),
       userId: user?.id ?? null,
       email: user?.email ?? null,
+      fullName: user?.fullName ?? "",
+      suffix: user?.suffix ?? "",
+      eSignFileId: user?.eSignFileId ?? null,
       isSuperAdmin: Boolean(user?.isSuperAdmin),
       isAdmin: Boolean(user?.isAdmin),
       permissionKeys: Array.isArray(user?.permissionKeys) ? user.permissionKeys : [],
@@ -116,8 +129,9 @@ export function UserProvider({ children }) {
       },
       setSession,
       clearSession,
+      applyMeUser,
     }),
-    [token, user, sessionLoading, setSession, clearSession],
+    [token, user, sessionLoading, setSession, clearSession, applyMeUser],
   );
 
   return (

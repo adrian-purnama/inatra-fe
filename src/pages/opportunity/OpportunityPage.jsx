@@ -121,8 +121,15 @@ export function OpportunityPage() {
     }
   }
 
-  async function handleCreateQuotationFromOpportunity(opportunityId) {
+  async function handleCreateQuotationFromOpportunity(opportunityId, details) {
     setErr("");
+    // ponytail: same rule as backend seed — free-text lines block quotation
+    if ((details ?? []).some((d) => !String(d?.sku ?? "").trim())) {
+      setErr(
+        "Cannot create quotation: every line must use a product SKU. Free-text lines are not allowed select a product first.",
+      );
+      return;
+    }
     try {
       const res = await apiPost(paths.quotationFromOpportunity(opportunityId), {});
       const quotationId = String(res?.data?.item?.id ?? "");
@@ -338,7 +345,7 @@ export function OpportunityPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => handleCreateQuotationFromOpportunity(row.id)}
+                    onClick={() => handleCreateQuotationFromOpportunity(row.id, row.details)}
                     className="rounded-md border border-blue-300 px-2.5 py-1 text-xs font-medium text-blue-700 transition-colors hover:bg-blue-50 dark:border-blue-700 dark:text-blue-300 dark:hover:bg-blue-950/30"
                   >
                     Create quotation
