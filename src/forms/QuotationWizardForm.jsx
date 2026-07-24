@@ -88,10 +88,12 @@ function optionalId(value, isEdit) {
   return isEdit ? null : undefined;
 }
 
-export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
+export function QuotationWizardForm({ initial, onSuccess, onCancel, variant = "modal" }) {
   const isEdit = Boolean(initial?.id);
+  const isPage = variant === "page";
   const [submitting, setSubmitting] = useState(false);
   const [formErr, setFormErr] = useState("");
+  const [resetTick, setResetTick] = useState(0);
   const [lineOfBusinessOptions, setLineOfBusinessOptions] = useState([]);
   const [marketSegmentOptions, setMarketSegmentOptions] = useState([]);
   const [orgOptions, setOrgOptions] = useState([]);
@@ -136,7 +138,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
       ? initial.quotationInformationSelected.termsOfWarrantySelected.map((x) => String(x ?? ""))
       : [],
   );
-  const [discountTotal, setDiscountTotal] = useState(initial?.discountTotal ?? 0);
+  const [discountTotal, setDiscountTotal] = useState(0); // ponytail: doc discount unused; per-line only
   const [taxRate, setTaxRate] = useState(initial?.taxRate ?? 0);
   const [propability, setPropability] = useState(initial?.propability ?? 0);
   const [estimateCloseMonth, setEstimateCloseMonth] = useState(
@@ -187,7 +189,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
         ? initial.quotationInformationSelected.termsOfWarrantySelected.map((x) => String(x ?? ""))
         : [],
     );
-    setDiscountTotal(Number(initial?.discountTotal ?? 0));
+    setDiscountTotal(0);
     setTaxRate(Number(initial?.taxRate ?? 0));
     setPropability(Number(initial?.propability ?? 0));
     setEstimateCloseMonth(monthValueFromDate(initial?.estimateCloseDate));
@@ -202,7 +204,7 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
         : [emptyQuotationDetailRow(0)],
     );
     setFormErr("");
-  }, [initial]);
+  }, [initial, resetTick]);
 
   useEffect(() => {
     let cancelled = false;
@@ -415,6 +417,13 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
     setDetails((prev) => [...prev, emptyQuotationDetailRow(prev.length)]);
   }
 
+  function removeDetail(idx) {
+    setDetails((prev) => {
+      const next = prev.filter((_, i) => i !== idx);
+      return next.length > 0 ? next : [emptyQuotationDetailRow(0)];
+    });
+  }
+
   async function onSubmit(e) {
     e.preventDefault();
     if (!editable) return;
@@ -477,7 +486,10 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
   }
 
   return (
-    <form onSubmit={onSubmit} className="max-h-[80vh] space-y-4 overflow-y-auto pr-1">
+    <form
+      onSubmit={onSubmit}
+      className={`${isPage ? "" : "max-h-[80vh] overflow-y-auto pr-1"} space-y-4`}
+    >
       {formErr ? (
         <p className="rounded border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">
           {formErr}
@@ -557,17 +569,6 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
             value={marketSegmentId}
             onChange={setMarketSegmentId}
             options={marketSegmentOptions}
-            disabled={!editable}
-          />
-        </div>
-        <div>
-          <p className="mb-1 text-xs text-zinc-500">Discount total</p>
-          <input
-            className={inputClass}
-            type="number"
-            min={0}
-            value={discountTotal}
-            onChange={(e) => setDiscountTotal(Number(e.target.value || 0))}
             disabled={!editable}
           />
         </div>
@@ -764,10 +765,13 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
             </button>
           ) : null}
         </div>
-        <div className="space-y-2">
+        <div className="space-y-3">
           {details.map((d, idx) => (
-            <div key={idx} className="grid gap-2 md:grid-cols-6">
-              <div className="md:col-span-2">
+            <div
+              key={idx}
+              className="grid gap-2 rounded border border-zinc-200 p-3 sm:grid-cols-2 lg:grid-cols-6 dark:border-zinc-700"
+            >
+              <div className="sm:col-span-2 lg:col-span-2">
                 <label className="mb-1 block text-xs text-zinc-500">Product (SKU)</label>
                 <ProductSkuPicker
                   value={d.productId}
@@ -795,53 +799,76 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
                   }}
                 />
               </div>
-              <input
-                className={inputClass}
-                value={d.description}
-                onChange={(e) => updateDetail(idx, { description: e.target.value })}
-                placeholder="Name"
-                disabled={!editable || Boolean(d.productId)}
-                title={
-                  d.productId ? "Name comes from product catalog" : "Enter name for free-text line"
-                }
-              />
-              <input
-                className={inputClass}
-                type="number"
-                min={0}
-                value={d.quantity}
-                onChange={(e) => updateDetail(idx, { quantity: Number(e.target.value || 0) })}
-                placeholder="Qty"
-                disabled={!editable}
-              />
-              <input
-                className={inputClass}
-                type="number"
-                min={0}
-                value={d.price}
-                onChange={(e) => updateDetail(idx, { price: Number(e.target.value || 0) })}
-                placeholder="Price"
-                disabled={!editable}
-              />
-              <input
-                className={inputClass}
-                type="number"
-                min={0}
-                value={d.discount}
-                onChange={(e) => updateDetail(idx, { discount: Number(e.target.value || 0) })}
-                placeholder="Discount"
-                disabled={!editable}
-              />
-              <input
-                className={inputClass}
-                value={d.unit}
-                onChange={(e) => updateDetail(idx, { unit: e.target.value })}
-                placeholder="Unit"
-                disabled={!editable || Boolean(d.productId)}
-                title={
-                  d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"
-                }
-              />
+              <div className="sm:col-span-2 lg:col-span-2">
+                <label className="mb-1 block text-xs text-zinc-500">Description</label>
+                <input
+                  className={inputClass}
+                  value={d.description}
+                  onChange={(e) => updateDetail(idx, { description: e.target.value })}
+                  placeholder="Name"
+                  disabled={!editable || Boolean(d.productId)}
+                  title={
+                    d.productId ? "Name comes from product catalog" : "Enter name for free-text line"
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Qty</label>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  value={d.quantity}
+                  onChange={(e) => updateDetail(idx, { quantity: Number(e.target.value || 0) })}
+                  disabled={!editable}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Unit</label>
+                <input
+                  className={inputClass}
+                  value={d.unit}
+                  onChange={(e) => updateDetail(idx, { unit: e.target.value })}
+                  placeholder="Unit"
+                  disabled={!editable || Boolean(d.productId)}
+                  title={
+                    d.productId ? "Unit comes from product catalog" : "Enter unit for free-text line"
+                  }
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Price</label>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  value={d.price}
+                  onChange={(e) => updateDetail(idx, { price: Number(e.target.value || 0) })}
+                  disabled={!editable}
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-xs text-zinc-500">Discount</label>
+                <input
+                  className={inputClass}
+                  type="number"
+                  min={0}
+                  value={d.discount}
+                  onChange={(e) => updateDetail(idx, { discount: Number(e.target.value || 0) })}
+                  disabled={!editable}
+                />
+              </div>
+              {editable ? (
+                <div className="flex items-end sm:col-span-2 lg:col-span-6">
+                  <button
+                    type="button"
+                    onClick={() => removeDetail(idx)}
+                    className="rounded border border-red-300 px-2 py-1.5 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
+                  >
+                    Remove
+                  </button>
+                </div>
+              ) : null}
             </div>
           ))}
         </div>
@@ -853,9 +880,23 @@ export function QuotationWizardForm({ initial, onSuccess, onCancel }) {
       </div>
 
       <div className="flex justify-end gap-2 border-t border-zinc-200 pt-3 dark:border-zinc-700">
-        <button type="button" onClick={onCancel} className="rounded border border-zinc-300 px-3 py-2 text-sm">
-          Cancel
-        </button>
+        {isPage ? (
+          <button
+            type="button"
+            onClick={() => setResetTick((t) => t + 1)}
+            className="rounded border border-zinc-300 px-3 py-2 text-sm"
+          >
+            Reset
+          </button>
+        ) : onCancel ? (
+          <button
+            type="button"
+            onClick={onCancel}
+            className="rounded border border-zinc-300 px-3 py-2 text-sm"
+          >
+            Cancel
+          </button>
+        ) : null}
         <button
           type="submit"
           disabled={submitting || !editable}

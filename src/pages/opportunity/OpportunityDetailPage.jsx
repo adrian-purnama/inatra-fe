@@ -230,6 +230,14 @@ export function OpportunityDetailPage() {
   async function handleCreateQuotation() {
     if (!item?.id) return;
     setErr("");
+    // ponytail: same rule as backend seed — free-text lines block quotation
+    const lines = detailsDirty ? detailRows : (item.details ?? []);
+    if (lines.some((d) => !String(d.sku ?? "").trim())) {
+      setErr(
+        "Cannot create quotation: every line must use a product SKU. Free-text lines are not allowed — select a product first.",
+      );
+      return;
+    }
     try {
       const res = await apiPost(paths.quotationFromOpportunity(item.id), {});
       const quotationId = String(res?.data?.item?.id ?? "");
@@ -424,208 +432,203 @@ export function OpportunityDetailPage() {
               ) : null}
 
               {canEdit || detailRows.length > 0 ? (
-                <div className="mt-3 overflow-x-auto">
-                  <table className="w-full min-w-[860px] text-left text-sm">
-                    <thead>
-                      <tr className="border-b border-zinc-200 text-[11px] uppercase tracking-wide text-zinc-500 dark:border-zinc-700 dark:text-zinc-400">
-                        <th className="px-2 py-2 font-medium">Product (SKU)</th>
-                        <th className="px-2 py-2 font-medium">Description</th>
-                        <th className="w-20 px-2 py-2 text-right font-medium">Qty</th>
-                        <th className="w-20 px-2 py-2 font-medium">Unit</th>
-                        <th className="w-32 px-2 py-2 text-right font-medium">Unit price</th>
-                        <th className="w-28 px-2 py-2 text-right font-medium">Discount</th>
-                        <th className="w-32 px-2 py-2 text-right font-medium">Subtotal</th>
-                        {canEdit ? (
-                          <th className="w-20 px-2 py-2 text-right font-medium"> </th>
-                        ) : null}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {detailRows.map((d, idx) => {
-                        const lineSubtotal =
-                          Number(d.quantity ?? 0) * Number(d.price ?? 0) -
-                          Number(d.discount ?? 0);
-                        return (
-                          <tr
-                            key={`detail-${idx}`}
-                            className="border-b border-zinc-100 last:border-b-0 dark:border-zinc-800"
-                          >
-                            <td className="px-2 py-2">
-                              {canEdit ? (
-                                <ProductSkuPicker
-                                  value={d.productId}
-                                  sku={d.sku}
-                                  name={d.productName}
-                                  onChange={(sel) => {
-                                    if (!sel) {
-                                      updateDetailRow(idx, {
-                                        productId: "",
-                                        sku: "",
-                                        productName: "",
-                                        unit: "",
-                                        description: "",
-                                      });
-                                      return;
-                                    }
-                                    updateDetailRow(idx, {
-                                      productId: sel.productId,
-                                      sku: sel.sku,
-                                      productName: sel.name,
-                                      unit: sel.unit ?? "",
-                                      description: sel.name,
-                                    });
-                                  }}
-                                />
-                              ) : (
-                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
-                                  {String(d.sku ?? "").trim() || "-"}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2">
-                              {canEdit ? (
-                                <input
-                                  type="text"
-                                  value={d.description}
-                                  onChange={(e) =>
-                                    updateDetailRow(idx, { description: e.target.value })
-                                  }
-                                  className={detailInputClass}
-                                  placeholder="Description"
-                                  disabled={Boolean(d.productId)}
-                                  title={
-                                    d.productId
-                                      ? "Name comes from product catalog"
-                                      : "Enter name for free-text line"
-                                  }
-                                />
-                              ) : (
-                                <span className="text-zinc-800 dark:text-zinc-100">
-                                  {d.description || "-"}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              {canEdit ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={d.quantity}
-                                  onChange={(e) =>
-                                    updateDetailRow(idx, {
-                                      quantity: Number(e.target.value || 0),
-                                    })
-                                  }
-                                  className={`${detailInputClass} text-right`}
-                                />
-                              ) : (
-                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
-                                  {Number(d.quantity ?? 0)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2">
-                              {canEdit ? (
-                                <input
-                                  type="text"
-                                  value={d.unit}
-                                  onChange={(e) =>
-                                    updateDetailRow(idx, { unit: e.target.value })
-                                  }
-                                  className={detailInputClass}
-                                  placeholder="Unit"
-                                  disabled={Boolean(d.productId)}
-                                  title={
-                                    d.productId
-                                      ? "Unit comes from product catalog"
-                                      : "Enter unit for free-text line"
-                                  }
-                                />
-                              ) : (
-                                <span className="text-zinc-700 dark:text-zinc-200">
-                                  {d.unit || "-"}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              {canEdit ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={d.price}
-                                  onChange={(e) =>
-                                    updateDetailRow(idx, {
-                                      price: Number(e.target.value || 0),
-                                    })
-                                  }
-                                  className={`${detailInputClass} text-right`}
-                                />
-                              ) : (
-                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
-                                  {formatMoney(d.price)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2 text-right">
-                              {canEdit ? (
-                                <input
-                                  type="number"
-                                  min={0}
-                                  value={d.discount}
-                                  onChange={(e) =>
-                                    updateDetailRow(idx, {
-                                      discount: Number(e.target.value || 0),
-                                    })
-                                  }
-                                  className={`${detailInputClass} text-right`}
-                                />
-                              ) : (
-                                <span className="tabular-nums text-zinc-700 dark:text-zinc-200">
-                                  {formatMoney(d.discount)}
-                                </span>
-                              )}
-                            </td>
-                            <td className="px-2 py-2.5 text-right font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
-                              {formatMoney(lineSubtotal)}
-                            </td>
-                            {canEdit ? (
-                              <td className="px-2 py-2 text-right">
-                                <button
-                                  type="button"
-                                  onClick={() => removeDetailRow(idx)}
-                                  className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
-                                >
-                                  Remove
-                                </button>
-                              </td>
-                            ) : null}
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                    <tfoot>
-                      <tr className="border-t border-zinc-200 dark:border-zinc-700">
-                        <td
-                          colSpan={6}
-                          className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
-                        >
-                          Subtotal
-                        </td>
-                        <td className="px-2 py-2 text-right font-medium tabular-nums">
-                          {formatMoney(displaySubtotal)}
-                        </td>
-                        {canEdit ? <td /> : null}
-                      </tr>
-                      <tr>
-                        <td
-                          colSpan={5}
-                          className="px-2 py-2 text-sm text-zinc-600 dark:text-zinc-300"
-                        >
-                          Tax
-                        </td>
-                        <td className="px-2 py-2 text-right">
+                <div className="mt-3 space-y-3">
+                  {detailRows.map((d, idx) => {
+                    const lineSubtotal =
+                      Number(d.quantity ?? 0) * Number(d.price ?? 0) -
+                      Number(d.discount ?? 0);
+                    return (
+                      <div
+                        key={`detail-${idx}`}
+                        className="grid gap-2 rounded-lg border border-zinc-200 p-3 sm:grid-cols-2 lg:grid-cols-6 dark:border-zinc-700"
+                      >
+                        <div className="sm:col-span-2 lg:col-span-2">
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Product (SKU)
+                          </p>
                           {canEdit ? (
-                            <div className="flex items-center justify-end gap-1">
+                            <ProductSkuPicker
+                              value={d.productId}
+                              sku={d.sku}
+                              name={d.productName}
+                              onChange={(sel) => {
+                                if (!sel) {
+                                  updateDetailRow(idx, {
+                                    productId: "",
+                                    sku: "",
+                                    productName: "",
+                                    unit: "",
+                                    description: "",
+                                  });
+                                  return;
+                                }
+                                updateDetailRow(idx, {
+                                  productId: sel.productId,
+                                  sku: sel.sku,
+                                  productName: sel.name,
+                                  unit: sel.unit ?? "",
+                                  description: sel.name,
+                                });
+                              }}
+                            />
+                          ) : (
+                            <p className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">
+                              {String(d.sku ?? "").trim() || "-"}
+                            </p>
+                          )}
+                        </div>
+                        <div className="sm:col-span-2 lg:col-span-2">
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Description
+                          </p>
+                          {canEdit ? (
+                            <input
+                              type="text"
+                              value={d.description}
+                              onChange={(e) =>
+                                updateDetailRow(idx, { description: e.target.value })
+                              }
+                              className={detailInputClass}
+                              placeholder="Description"
+                              disabled={Boolean(d.productId)}
+                              title={
+                                d.productId
+                                  ? "Name comes from product catalog"
+                                  : "Enter name for free-text line"
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm text-zinc-800 dark:text-zinc-100">
+                              {d.description || "-"}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Qty
+                          </p>
+                          {canEdit ? (
+                            <input
+                              type="number"
+                              min={0}
+                              value={d.quantity}
+                              onChange={(e) =>
+                                updateDetailRow(idx, {
+                                  quantity: Number(e.target.value || 0),
+                                })
+                              }
+                              className={detailInputClass}
+                            />
+                          ) : (
+                            <p className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">
+                              {Number(d.quantity ?? 0)}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Unit
+                          </p>
+                          {canEdit ? (
+                            <input
+                              type="text"
+                              value={d.unit}
+                              onChange={(e) =>
+                                updateDetailRow(idx, { unit: e.target.value })
+                              }
+                              className={detailInputClass}
+                              placeholder="Unit"
+                              disabled={Boolean(d.productId)}
+                              title={
+                                d.productId
+                                  ? "Unit comes from product catalog"
+                                  : "Enter unit for free-text line"
+                              }
+                            />
+                          ) : (
+                            <p className="text-sm text-zinc-700 dark:text-zinc-200">
+                              {d.unit || "-"}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Unit price
+                          </p>
+                          {canEdit ? (
+                            <input
+                              type="number"
+                              min={0}
+                              value={d.price}
+                              onChange={(e) =>
+                                updateDetailRow(idx, {
+                                  price: Number(e.target.value || 0),
+                                })
+                              }
+                              className={detailInputClass}
+                            />
+                          ) : (
+                            <p className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">
+                              {formatMoney(d.price)}
+                            </p>
+                          )}
+                        </div>
+                        <div>
+                          <p className="mb-1 text-[11px] font-medium uppercase tracking-wide text-zinc-500">
+                            Discount
+                          </p>
+                          {canEdit ? (
+                            <input
+                              type="number"
+                              min={0}
+                              value={d.discount}
+                              onChange={(e) =>
+                                updateDetailRow(idx, {
+                                  discount: Number(e.target.value || 0),
+                                })
+                              }
+                              className={detailInputClass}
+                            />
+                          ) : (
+                            <p className="text-sm tabular-nums text-zinc-700 dark:text-zinc-200">
+                              {formatMoney(d.discount)}
+                            </p>
+                          )}
+                        </div>
+                        <div className="flex flex-wrap items-end justify-between gap-2 sm:col-span-2 lg:col-span-6">
+                          <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                            Subtotal:{" "}
+                            <span className="font-medium tabular-nums text-zinc-900 dark:text-zinc-100">
+                              {formatMoney(lineSubtotal)}
+                            </span>
+                          </p>
+                          {canEdit ? (
+                            <button
+                              type="button"
+                              onClick={() => removeDetailRow(idx)}
+                              className="rounded-md border border-red-300 px-2 py-1 text-xs font-medium text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300 dark:hover:bg-red-950/30"
+                            >
+                              Remove
+                            </button>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+
+                  <div className="rounded-lg border border-zinc-200 bg-zinc-50/80 p-3 dark:border-zinc-700 dark:bg-zinc-800/40">
+                    <div className="flex flex-wrap items-end justify-between gap-3">
+                      <div>
+                        <p className="text-sm text-zinc-600 dark:text-zinc-300">
+                          Subtotal:{" "}
+                          <span className="font-medium tabular-nums">
+                            {formatMoney(displaySubtotal)}
+                          </span>
+                        </p>
+                        <p className="mt-1 flex flex-wrap items-center gap-2 text-sm text-zinc-600 dark:text-zinc-300">
+                          <span>Tax</span>
+                          {canEdit ? (
+                            <span className="inline-flex items-center gap-1">
                               <input
                                 type="number"
                                 min={0}
@@ -634,33 +637,23 @@ export function OpportunityDetailPage() {
                                   setTaxRateInput(Number(e.target.value || 0));
                                   setDetailsDirty(true);
                                 }}
-                                className={`${detailInputClass} w-20 text-right`}
+                                className={`${detailInputClass} w-20`}
                               />
                               <span className="text-xs text-zinc-500">%</span>
-                            </div>
+                            </span>
                           ) : (
-                            <span className="text-sm tabular-nums">{displayTaxRate}%</span>
+                            <span className="tabular-nums">{displayTaxRate}%</span>
                           )}
-                        </td>
-                        <td className="px-2 py-2 text-right font-medium tabular-nums">
-                          {formatMoney(displayTaxAmount)}
-                        </td>
-                        {canEdit ? <td /> : null}
-                      </tr>
-                      <tr className="border-t-2 border-zinc-300 dark:border-zinc-600">
-                        <td
-                          colSpan={6}
-                          className="px-2 py-3 text-sm font-semibold text-zinc-800 dark:text-zinc-100"
-                        >
-                          Grand total
-                        </td>
-                        <td className="px-2 py-3 text-right text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
-                          {formatMoney(displayGrandTotal)}
-                        </td>
-                        {canEdit ? <td /> : null}
-                      </tr>
-                    </tfoot>
-                  </table>
+                          <span className="font-medium tabular-nums">
+                            ({formatMoney(displayTaxAmount)})
+                          </span>
+                        </p>
+                      </div>
+                      <p className="text-base font-semibold tabular-nums text-zinc-900 dark:text-zinc-100">
+                        Grand total: {formatMoney(displayGrandTotal)}
+                      </p>
+                    </div>
+                  </div>
                 </div>
               ) : (
                 <div className="mt-3 space-y-2">

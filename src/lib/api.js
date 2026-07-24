@@ -20,6 +20,8 @@ export const paths = {
   authMe: "/auth/me",
   /** GET — same payload as `authMe` (alias for session checks) */
   authValidate: "/auth/validate",
+  /** POST multipart `file` — private e-sign image (owner ACL only) */
+  authMeEsign: "/auth/me/esign",
   /** GET — public app name, logo, openRegister / openLogin */
   branding: "/branding",
   /** GET — public company/quotation profile info */
